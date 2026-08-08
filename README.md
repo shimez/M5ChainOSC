@@ -132,4 +132,23 @@ Atomic ToChain Base 利用時の一般的な配線に合わせています。別
 
 ## 開発について
 本ファームウェアは、M5Stack Chain の挙動確認・NVS 永続化・ホットスワップ・Web UI・VRChat 向けレンジ処理など、実機フィードバックを踏まえた修正を繰り返し、Grok（xAI） が中心となってコードを生成・統合したものです。
+
 不具合報告や改善案は Issue で歓迎します。
+
+---
+
+## ライセンス
+
+MIT License（必要に応じてリポジトリの `LICENSE` を参照）
+
+利用する各ライブラリ（M5Unified / M5Chain / ArduinoOSC 等）のライセンスも併せて確認してください。
+
+---
+
+## 参考リンク
+
+- [M5Stack Docs](https://docs.m5stack.com/)
+- [VRChat OSC](https://docs.vrchat.com/docs/osc-overview)
+- [Grok / xAI](https://x.ai/)
+```
+
