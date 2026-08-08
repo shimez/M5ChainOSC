@@ -18,6 +18,18 @@ Chain バス上の入力デバイス（Key / Encoder / Angle / Joystick）をポ
 
 ---
 
+## Demo
+
+動作デモ（動画）:
+
+1. [https://x.com/ctake_shimez/status/2084966417183740093](https://x.com/ctake_shimez/status/2084966417183740093)
+2. [https://x.com/ctake_shimez/status/2084979076373401990](https://x.com/ctake_shimez/status/2084979076373401990)
+3. [https://x.com/ctake_shimez/status/2084993484382232908](https://x.com/ctake_shimez/status/2084993484382232908)
+
+関連ポストは [#M5ChainOSC](https://x.com/search?q=%23M5ChainOSC&src=hashtag_click) でまとめています。
+
+---
+
 ## 対応ハードウェア
 
 | 役割 | 製品 |
