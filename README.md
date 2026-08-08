@@ -139,7 +139,7 @@ Atomic ToChain Base 利用時の一般的な配線に合わせています。別
 
 ## ライセンス
 
-MIT License（必要に応じてリポジトリの `LICENSE` を参照）
+MIT License
 
 利用する各ライブラリ（M5Unified / M5Chain / ArduinoOSC 等）のライセンスも併せて確認してください。
 
