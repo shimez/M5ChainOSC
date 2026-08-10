@@ -14,6 +14,14 @@ static String typeSelectHtml(const String& name, ValueType cur) {
   return s;
 }
 
+static String numericTypeSelectHtml(const String& name, ValueType cur) {
+  ValueType c = (cur == TYPE_STRING) ? TYPE_FLOAT : cur;
+  String s = "<select name='" + name + "'>";
+  s += "<option value='0'" + String(c == TYPE_FLOAT ? " selected" : "") + ">Float</option>";
+  s += "<option value='1'" + String(c == TYPE_INT ? " selected" : "") + ">Int</option></select>";
+  return s;
+}
+
 static String clickModeHtml(const String& name, KeyMode cur, const String& prId, const String& sqId) {
   String s = "<div class='mode-box'><label>Click Mode</label>";
   s += "<select name='" + name + "' onchange=\"toggleClickMode('" + prId + "','" + sqId + "',this)\">";
@@ -214,6 +222,14 @@ function toggleClickMode(prId,sqId,sel){toggleMode(document.getElementById(prId)
       html += "<label>End</label><input type='number' step='any' name='j2_" + idx + "' value='" + String(devices[i].joy.clickSeq.end) + "'>";
       html += "<label>Step</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
       html += "<label>Type</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div>";
+    } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
+      html += "<div class='ang'><strong>ToF Distance (mm)</strong>";
+      html += "<label>Address</label><input name='fa_" + idx + "' value='" + htmlEscape(devices[i].tof.addr) + "'>";
+      html += "<label>Deadband (mm)</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
+      html += "<label>Out Min</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'>";
+      html += "<label>Out Max</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'>";
+      html += "<label>Out Type</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType);
+      html += "<p class='note'>Input range fixed: 30–2000 mm → mapped to Out Min/Max</p></div>";
     } else {
       html += "<p class='note'>Type code: " + String((int)devices[i].type) + "</p>";
     }
@@ -329,6 +345,22 @@ void handleSave() {
       if (server.hasArg("j3_" + idx)) devices[i].joy.clickSeq.step = server.arg("j3_" + idx).toFloat();
       if (server.hasArg("jl_" + idx)) devices[i].joy.clickSeq.valueType = (ValueType)server.arg("jl_" + idx).toInt();
       normalizeSequence(devices[i].joy.clickSeq);
+    } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
+      if (server.hasArg("fa_" + idx)) {
+        String a = server.arg("fa_" + idx);
+        a.trim();
+        if (a.length() && a.startsWith("/")) devices[i].tof.addr = a;
+      }
+      if (server.hasArg("fd_" + idx)) {
+        int db = server.arg("fd_" + idx).toInt();
+        devices[i].tof.deadband = constrain(db, 1, 2000);
+      }
+      if (server.hasArg("fo_" + idx)) devices[i].tof.map.outMin = server.arg("fo_" + idx).toFloat();
+      if (server.hasArg("fO_" + idx)) devices[i].tof.map.outMax = server.arg("fO_" + idx).toFloat();
+      if (server.hasArg("ft_" + idx)) {
+        int t = server.arg("ft_" + idx).toInt();
+        devices[i].tof.map.outType = (t == TYPE_INT) ? TYPE_INT : TYPE_FLOAT;
+      }
     }
 
     saveDeviceSettings(devices[i]);

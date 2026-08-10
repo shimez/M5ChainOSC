@@ -75,6 +75,7 @@ const char* typeToName(chain_device_type_t t) {
     case CHAIN_ENCODER_TYPE_CODE:  return "Encoder";
     case CHAIN_ANGLE_TYPE_CODE:    return "Angle";
     case CHAIN_JOYSTICK_TYPE_CODE: return "Joystick";
+    case CHAIN_TOF_TYPE_CODE:      return "ToF";
     default:                       return "Unknown";
   }
 }

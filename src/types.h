@@ -64,6 +64,12 @@ struct JoystickOscConfig {
   SequenceConfig clickSeq;
 };
 
+struct TofOscConfig {
+  String   addr     = "/avatar/parameters/ToF";
+  int      deadband = 5;   // mm
+  RangeMap map;            // in: 30–2000 mm → out: configurable
+};
+
 // ---------------------------------------------------------------------------
 // Live Chain device slot
 // ---------------------------------------------------------------------------
@@ -83,6 +89,7 @@ struct ChainDevice {
   EncoderOscConfig  enc;
   AngleOscConfig    angle;
   JoystickOscConfig joy;
+  TofOscConfig      tof;
 
   // runtime state
   uint8_t lastButtonStatus = 0;
@@ -92,6 +99,12 @@ struct ChainDevice {
   int16_t lastJoyX         = 0;
   int16_t lastJoyY         = 0;
   bool    joyInited        = false;
+  int      lastTofMm       = -1;
+  bool     tofInited       = false;
+  bool     tofConfigured   = false;
+  uint32_t lastTofPollMs   = 0;
+  uint32_t lastTofConfigMs = 0;
+  uint8_t  tofReadFailures = 0;
 };
 
 // ---------------------------------------------------------------------------
