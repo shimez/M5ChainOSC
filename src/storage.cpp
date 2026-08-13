@@ -46,11 +46,44 @@ String deviceNameKeyLegacy(const String& uid) {
 // ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
+static OSCMessage makeOSCMessage(const char* address, const char* value,
+                                 ValueType type) {
+  OSCMessage message;
+  message.address = address;
+  message.valueStr = value;
+  message.valueType = type;
+  return message;
+}
+
+static SequenceConfig makeSequenceConfig(const char* address, ValueType type,
+                                         float start, float end, float step,
+                                         float current) {
+  SequenceConfig sequence;
+  sequence.address = address;
+  sequence.valueType = type;
+  sequence.start = start;
+  sequence.end = end;
+  sequence.step = step;
+  sequence.current = current;
+  return sequence;
+}
+
+static RangeMap makeRangeMap(float inMin, float inMax, float outMin,
+                             float outMax, ValueType type) {
+  RangeMap map;
+  map.inMin = inMin;
+  map.inMax = inMax;
+  map.outMin = outMin;
+  map.outMax = outMax;
+  map.outType = type;
+  return map;
+}
+
 void setDefaultDeviceMessages(ChainDevice& d) {
   d.displayName = "";
   d.mode = MODE_PRESS_RELEASE;
-  d.press   = {"/avatar/parameters/Key", "1.0", TYPE_FLOAT};
-  d.release = {"/avatar/parameters/Key", "0.0", TYPE_FLOAT};
+  d.press   = makeOSCMessage("/avatar/parameters/Key", "1.0", TYPE_FLOAT);
+  d.release = makeOSCMessage("/avatar/parameters/Key", "0.0", TYPE_FLOAT);
   d.pressMessageCount = 1;
   d.releaseMessageCount = 1;
   for (int i = 0; i < MAX_KEY_OSC_MESSAGES; i++) {
@@ -59,42 +92,49 @@ void setDefaultDeviceMessages(ChainDevice& d) {
   }
   d.pressMessages[0] = d.press;
   d.releaseMessages[0] = d.release;
-  d.seq     = {"/avatar/parameters/KeySeq", TYPE_FLOAT, 0, 10, 1, 0};
+  d.seq = makeSequenceConfig("/avatar/parameters/KeySeq", TYPE_FLOAT,
+                             0, 10, 1, 0);
 
   d.enc.rotAddr       = "/avatar/parameters/Encoder";
   d.enc.sendIncrement = false;
   d.enc.absInMin      = 0;
   d.enc.absInMax      = 20;
   d.enc.incScale      = 0.05f;
-  d.enc.map           = {0, 20, 0, 1, TYPE_FLOAT};
+  d.enc.map           = makeRangeMap(0, 20, 0, 1, TYPE_FLOAT);
   d.enc.clickMode     = MODE_PRESS_RELEASE;
-  d.enc.press         = {"/avatar/parameters/EncoderClick", "1.0", TYPE_FLOAT};
-  d.enc.release       = {"/avatar/parameters/EncoderClick", "0.0", TYPE_FLOAT};
+  d.enc.press = makeOSCMessage("/avatar/parameters/EncoderClick", "1.0",
+                               TYPE_FLOAT);
+  d.enc.release = makeOSCMessage("/avatar/parameters/EncoderClick", "0.0",
+                                 TYPE_FLOAT);
   d.enc.pressMessageCount = d.enc.releaseMessageCount = 1;
   d.enc.pressMessages[0] = d.enc.press; d.enc.releaseMessages[0] = d.enc.release;
-  d.enc.clickSeq      = {"/avatar/parameters/EncoderSeq", TYPE_FLOAT, 0, 10, 1, 0};
+  d.enc.clickSeq = makeSequenceConfig("/avatar/parameters/EncoderSeq",
+                                      TYPE_FLOAT, 0, 10, 1, 0);
 
   d.angle.addr     = "/avatar/parameters/Angle";
   d.angle.use12bit = true;
   d.angle.deadband = 8;
-  d.angle.map      = {0, 4095, 0, 1, TYPE_FLOAT};
+  d.angle.map      = makeRangeMap(0, 4095, 0, 1, TYPE_FLOAT);
 
   d.joy.xAddr     = "/avatar/parameters/JoyX";
   d.joy.yAddr     = "/avatar/parameters/JoyY";
   d.joy.deadband  = 3;
   d.joy.invertX   = false;
   d.joy.invertY   = false;
-  d.joy.map       = {-127, 127, -1, 1, TYPE_FLOAT};
+  d.joy.map       = makeRangeMap(-127, 127, -1, 1, TYPE_FLOAT);
   d.joy.clickMode = MODE_PRESS_RELEASE;
-  d.joy.press     = {"/avatar/parameters/JoyClick", "1.0", TYPE_FLOAT};
-  d.joy.release   = {"/avatar/parameters/JoyClick", "0.0", TYPE_FLOAT};
+  d.joy.press = makeOSCMessage("/avatar/parameters/JoyClick", "1.0",
+                               TYPE_FLOAT);
+  d.joy.release = makeOSCMessage("/avatar/parameters/JoyClick", "0.0",
+                                 TYPE_FLOAT);
   d.joy.pressMessageCount = d.joy.releaseMessageCount = 1;
   d.joy.pressMessages[0] = d.joy.press; d.joy.releaseMessages[0] = d.joy.release;
-  d.joy.clickSeq  = {"/avatar/parameters/JoySeq", TYPE_FLOAT, 0, 10, 1, 0};
+  d.joy.clickSeq = makeSequenceConfig("/avatar/parameters/JoySeq", TYPE_FLOAT,
+                                      0, 10, 1, 0);
 
   d.tof.addr     = "/avatar/parameters/ToF";
   d.tof.deadband = 5;
-  d.tof.map      = {30, 2000, 0, 1, TYPE_FLOAT};
+  d.tof.map      = makeRangeMap(30, 2000, 0, 1, TYPE_FLOAT);
 
   d.encInited = false;
   d.joyInited = false;
