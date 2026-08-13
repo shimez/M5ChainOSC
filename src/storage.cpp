@@ -1,6 +1,13 @@
 #include "storage.h"
 #include "globals.h"
 #include "display.h"
+#include <ctype.h>
+
+#if M5CHAINOSC_STORAGE_DEBUG
+#define STORAGE_LOG(...) do { Serial.print("[M5OSC][NVS] "); Serial.printf(__VA_ARGS__); Serial.println(); } while (0)
+#else
+#define STORAGE_LOG(...) do {} while (0)
+#endif
 
 // ---------------------------------------------------------------------------
 // NVS keys (15-char limit; use 32-bit hash of full UID)
@@ -44,6 +51,14 @@ void setDefaultDeviceMessages(ChainDevice& d) {
   d.mode = MODE_PRESS_RELEASE;
   d.press   = {"/avatar/parameters/Key", "1.0", TYPE_FLOAT};
   d.release = {"/avatar/parameters/Key", "0.0", TYPE_FLOAT};
+  d.pressMessageCount = 1;
+  d.releaseMessageCount = 1;
+  for (int i = 0; i < MAX_KEY_OSC_MESSAGES; i++) {
+    d.pressMessages[i] = OSCMessage();
+    d.releaseMessages[i] = OSCMessage();
+  }
+  d.pressMessages[0] = d.press;
+  d.releaseMessages[0] = d.release;
   d.seq     = {"/avatar/parameters/KeySeq", TYPE_FLOAT, 0, 10, 1, 0};
 
   d.enc.rotAddr       = "/avatar/parameters/Encoder";
@@ -55,6 +70,8 @@ void setDefaultDeviceMessages(ChainDevice& d) {
   d.enc.clickMode     = MODE_PRESS_RELEASE;
   d.enc.press         = {"/avatar/parameters/EncoderClick", "1.0", TYPE_FLOAT};
   d.enc.release       = {"/avatar/parameters/EncoderClick", "0.0", TYPE_FLOAT};
+  d.enc.pressMessageCount = d.enc.releaseMessageCount = 1;
+  d.enc.pressMessages[0] = d.enc.press; d.enc.releaseMessages[0] = d.enc.release;
   d.enc.clickSeq      = {"/avatar/parameters/EncoderSeq", TYPE_FLOAT, 0, 10, 1, 0};
 
   d.angle.addr     = "/avatar/parameters/Angle";
@@ -71,6 +88,8 @@ void setDefaultDeviceMessages(ChainDevice& d) {
   d.joy.clickMode = MODE_PRESS_RELEASE;
   d.joy.press     = {"/avatar/parameters/JoyClick", "1.0", TYPE_FLOAT};
   d.joy.release   = {"/avatar/parameters/JoyClick", "0.0", TYPE_FLOAT};
+  d.joy.pressMessageCount = d.joy.releaseMessageCount = 1;
+  d.joy.pressMessages[0] = d.joy.press; d.joy.releaseMessages[0] = d.joy.release;
   d.joy.clickSeq  = {"/avatar/parameters/JoySeq", TYPE_FLOAT, 0, 10, 1, 0};
 
   d.tof.addr     = "/avatar/parameters/ToF";
@@ -112,6 +131,90 @@ static String nextField(const String& src, int& idx) {
   return part;
 }
 
+static bool plausibleOscAddress(const String& address) {
+  if (!address.startsWith("/") || address.length() > MAX_OSC_ADDRESS_BYTES) return false;
+  for (size_t i = 0; i < address.length(); i++) {
+    char c = address[i];
+    if (isspace((unsigned char)c) || c == '#' || c == '*' || c == ',' || c == '?' ||
+        c == '[' || c == ']' || c == '{' || c == '}') return false;
+  }
+  return true;
+}
+
+static void sanitizeStoredMessages(OSCMessage* messages, uint8_t& count) {
+  uint8_t write = 0;
+  for (uint8_t read = 0; read < count && read < MAX_KEY_OSC_MESSAGES; read++) {
+    OSCMessage message = messages[read];
+    message.address.trim();
+    // Recover the recognizable address/value reversal seen in damaged settings.
+    if (!plausibleOscAddress(message.address) && plausibleOscAddress(message.valueStr)) {
+      String oldAddress = message.address;
+      message.address = message.valueStr;
+      message.valueStr = oldAddress;
+    }
+    if (!plausibleOscAddress(message.address)) continue;
+    messages[write++] = message;
+  }
+  count = write;
+}
+
+static String serializeKeyMessages(const ChainDevice& d) {
+  const OSCMessage* press = d.pressMessages; const OSCMessage* release = d.releaseMessages;
+  uint8_t pressCount = d.pressMessageCount, releaseCount = d.releaseMessageCount;
+  if (d.type == CHAIN_ENCODER_TYPE_CODE) { press=d.enc.pressMessages; release=d.enc.releaseMessages; pressCount=d.enc.pressMessageCount; releaseCount=d.enc.releaseMessageCount; }
+  else if (d.type == CHAIN_JOYSTICK_TYPE_CODE) { press=d.joy.pressMessages; release=d.joy.releaseMessages; pressCount=d.joy.pressMessageCount; releaseCount=d.joy.releaseMessageCount; }
+  String out;
+  appendField(out, String("KM3"));
+  appendField(out, (int)pressCount);
+  for (uint8_t i = 0; i < pressCount && i < MAX_KEY_OSC_MESSAGES; i++) {
+    appendField(out, press[i].address); appendField(out, press[i].valueStr); appendField(out, (int)press[i].valueType);
+  }
+  appendField(out, (int)releaseCount);
+  for (uint8_t i = 0; i < releaseCount && i < MAX_KEY_OSC_MESSAGES; i++) {
+    appendField(out, release[i].address); appendField(out, release[i].valueStr); appendField(out, (int)release[i].valueType);
+  }
+  return out;
+}
+
+static bool applyKeyMessages(ChainDevice& d, const String& blob) {
+  if (!blob.length()) {
+    STORAGE_LOG("KM2 apply skipped: uid=%s empty", d.uid.c_str());
+    return false;
+  }
+  int pos = 0;
+  auto field = [&]() { return nextField(blob, pos); };
+  String marker = field();
+  if (marker != "KM2" && marker != "KM3") {
+    STORAGE_LOG("KM2 invalid marker: uid=%s len=%u marker=%s", d.uid.c_str(), (unsigned)blob.length(), marker.c_str());
+    return false;
+  }
+  int parsedPressCount = field().toInt();
+  int pc = constrain(parsedPressCount, 0, MAX_KEY_OSC_MESSAGES);
+  OSCMessage* press = d.pressMessages; OSCMessage* release = d.releaseMessages;
+  uint8_t* pressCount = &d.pressMessageCount; uint8_t* releaseCount = &d.releaseMessageCount;
+  OSCMessage* legacyPress=&d.press; OSCMessage* legacyRelease=&d.release;
+  if (d.type == CHAIN_ENCODER_TYPE_CODE) { press=d.enc.pressMessages; release=d.enc.releaseMessages; pressCount=&d.enc.pressMessageCount; releaseCount=&d.enc.releaseMessageCount; legacyPress=&d.enc.press; legacyRelease=&d.enc.release; }
+  else if (d.type == CHAIN_JOYSTICK_TYPE_CODE) { press=d.joy.pressMessages; release=d.joy.releaseMessages; pressCount=&d.joy.pressMessageCount; releaseCount=&d.joy.releaseMessageCount; legacyPress=&d.joy.press; legacyRelease=&d.joy.release; }
+  *pressCount = (uint8_t)pc;
+  for (int n = 0; n < pc; n++) {
+    press[n].address = field(); press[n].valueStr = field();
+    int parsedType = field().toInt();
+    press[n].valueType = (ValueType)constrain(parsedType, (int)TYPE_FLOAT, (int)TYPE_STRING);
+  }
+  int parsedReleaseCount = field().toInt();
+  int rc = constrain(parsedReleaseCount, 0, MAX_KEY_OSC_MESSAGES - pc);
+  *releaseCount = (uint8_t)rc;
+  for (int n = 0; n < rc; n++) {
+    release[n].address = field(); release[n].valueStr = field();
+    int parsedType = field().toInt();
+    release[n].valueType = (ValueType)constrain(parsedType, (int)TYPE_FLOAT, (int)TYPE_STRING);
+  }
+  sanitizeStoredMessages(press, *pressCount); sanitizeStoredMessages(release, *releaseCount);
+  if (*pressCount > 0) *legacyPress = press[0]; if (*releaseCount > 0) *legacyRelease = release[0];
+  STORAGE_LOG("KM applied: uid=%s press=%u release=%u len=%u", d.uid.c_str(), *pressCount, *releaseCount, (unsigned)blob.length());
+  return true;
+}
+
 String serializeDeviceConfig(const ChainDevice& d) {
   String o;
   appendField(o, (int)d.type);
@@ -147,7 +250,14 @@ String serializeDeviceConfig(const ChainDevice& d) {
   appendField(o, d.tof.deadband);
   appendField(o, d.tof.map.outMin); appendField(o, d.tof.map.outMax);
   appendField(o, (int)d.tof.map.outType);
+
   return o;
+}
+
+size_t deviceConfigStorageBytes(const ChainDevice& d) {
+  size_t bytes = serializeDeviceConfig(d).length();
+  if (d.type == CHAIN_KEY_TYPE_CODE || d.type == CHAIN_ENCODER_TYPE_CODE || d.type == CHAIN_JOYSTICK_TYPE_CODE) bytes += serializeKeyMessages(d).length();
+  return bytes;
 }
 
 void applySerializedConfig(ChainDevice& d, const String& blob) {
@@ -227,6 +337,40 @@ void applySerializedConfig(ChainDevice& d, const String& blob) {
       d.tof.map.outType = (ValueType)asInt();
     }
   }
+
+  // Multi-message extension. Without it, migrate the legacy single messages.
+  d.pressMessageCount = 1;
+  d.releaseMessageCount = 1;
+  d.pressMessages[0] = d.press;
+  d.releaseMessages[0] = d.release;
+  String marker = s();
+  if (marker == "KM1") {
+    int parsedPressCount = asInt();
+    int pc = constrain(parsedPressCount, 0, MAX_KEY_OSC_MESSAGES);
+    d.pressMessageCount = (uint8_t)pc;
+    for (int n = 0; n < pc; n++) {
+      d.pressMessages[n].address = s();
+      d.pressMessages[n].valueStr = s();
+      int parsedType = asInt();
+      d.pressMessages[n].valueType = (ValueType)constrain(parsedType, (int)TYPE_FLOAT, (int)TYPE_STRING);
+    }
+    int remaining = MAX_KEY_OSC_MESSAGES - pc;
+    int parsedReleaseCount = asInt();
+    int rc = constrain(parsedReleaseCount, 0, remaining);
+    d.releaseMessageCount = (uint8_t)rc;
+    for (int n = 0; n < rc; n++) {
+      d.releaseMessages[n].address = s();
+      d.releaseMessages[n].valueStr = s();
+      int parsedType = asInt();
+      d.releaseMessages[n].valueType = (ValueType)constrain(parsedType, (int)TYPE_FLOAT, (int)TYPE_STRING);
+    }
+    if (pc > 0) d.press = d.pressMessages[0];
+    if (rc > 0) d.release = d.releaseMessages[0];
+  }
+  sanitizeStoredMessages(d.pressMessages, d.pressMessageCount);
+  sanitizeStoredMessages(d.releaseMessages, d.releaseMessageCount);
+  if (d.pressMessageCount > 0) d.press = d.pressMessages[0];
+  if (d.releaseMessageCount > 0) d.release = d.releaseMessages[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -266,8 +410,10 @@ void loadDeviceSettings(ChainDevice& d) {
   String dedicatedName = loadDeviceNameOnly(d.uid);
   String keyNew = deviceCfgKey(d.uid);
   String keyOld = deviceCfgKeyLegacy(d.uid);
+  STORAGE_LOG("LOAD begin: uid=%s type=%d key=%s legacy=%s", d.uid.c_str(), (int)liveType, keyNew.c_str(), keyOld.c_str());
 
   if (!prefs.begin("devcfg", true)) {
+    STORAGE_LOG("LOAD devcfg begin failed: uid=%s", d.uid.c_str());
     if (dedicatedName.length()) d.displayName = dedicatedName;
     else applyKnownDisplayName(d);
     return;
@@ -289,12 +435,30 @@ void loadDeviceSettings(ChainDevice& d) {
   };
 
   String blob = readBlob(keyNew);
-  if (!blob.length()) blob = readBlob(keyOld);
+  bool usedLegacy = false;
+  if (!blob.length()) {
+    blob = readBlob(keyOld);
+    usedLegacy = blob.length() > 0;
+  }
   prefs.end();
+  STORAGE_LOG("LOAD base: uid=%s len=%u source=%s", d.uid.c_str(), (unsigned)blob.length(), usedLegacy ? "legacy" : (blob.length() ? "hashed" : "none"));
 
   if (blob.length()) {
     applySerializedConfig(d, blob);
     if (liveType != CHAIN_UNKNOWN_TYPE_CODE) d.type = liveType;
+  }
+
+  // KM2 is stored separately so loading does not depend on the layout of the
+  // legacy all-device blob. The embedded KM1 extension remains a fallback.
+  if (liveType == CHAIN_KEY_TYPE_CODE || liveType == CHAIN_ENCODER_TYPE_CODE || liveType == CHAIN_JOYSTICK_TYPE_CODE) {
+    if (prefs.begin("keymulti", true)) {
+      String multi = prefs.getString(keyNew.c_str(), "");
+      prefs.end();
+      STORAGE_LOG("LOAD keymulti: uid=%s key=%s len=%u", d.uid.c_str(), keyNew.c_str(), (unsigned)multi.length());
+      applyKeyMessages(d, multi);
+    } else {
+      STORAGE_LOG("LOAD keymulti begin failed: uid=%s", d.uid.c_str());
+    }
   }
 
   if (dedicatedName.length()) d.displayName = dedicatedName;
@@ -313,13 +477,17 @@ void loadDeviceSettings(ChainDevice& d) {
   d.tof.map.inMax = 2000;
 }
 
-void saveDeviceSettings(const ChainDevice& d) {
-  if (!d.uid.length() || isPlaceholderUid(d.uid)) return;
+bool saveDeviceSettings(const ChainDevice& d) {
+  if (!d.uid.length() || isPlaceholderUid(d.uid)) {
+    STORAGE_LOG("SAVE rejected placeholder: uid=%s", d.uid.c_str());
+    return false;
+  }
   saveDeviceNameOnly(d.uid, d.displayName);
 
   String key    = deviceCfgKey(d.uid);
   String keyOld = deviceCfgKeyLegacy(d.uid);
   String blob   = serializeDeviceConfig(d);
+  STORAGE_LOG("SAVE begin: uid=%s type=%d key=%s baseLen=%u press=%u release=%u", d.uid.c_str(), (int)d.type, key.c_str(), (unsigned)blob.length(), d.pressMessageCount, d.releaseMessageCount);
 
   auto tryWrite = [&](bool clearOldNs) -> bool {
     if (clearOldNs) {
@@ -329,7 +497,10 @@ void saveDeviceSettings(const ChainDevice& d) {
         p2.end();
       }
     }
-    if (!prefs.begin("devcfg", false)) return false;
+    if (!prefs.begin("devcfg", false)) {
+      STORAGE_LOG("SAVE devcfg begin failed: uid=%s", d.uid.c_str());
+      return false;
+    }
     prefs.remove(keyOld.c_str());
     prefs.remove(key.c_str());
     size_t wrote = prefs.putBytes(key.c_str(), blob.c_str(), blob.length());
@@ -341,22 +512,62 @@ void saveDeviceSettings(const ChainDevice& d) {
     bool ok = (len2 == blob.length()) ||
               (prefs.getString(key.c_str(), "").length() == (int)blob.length());
     prefs.end();
+    STORAGE_LOG("SAVE base result: uid=%s wrote=%u storedLen=%u expected=%u ok=%d", d.uid.c_str(), (unsigned)wrote, (unsigned)len2, (unsigned)blob.length(), ok ? 1 : 0);
     return ok;
   };
 
-  if (!tryWrite(false)) tryWrite(true);
-  registerKnownDevice(d.uid, d.displayName, d.type);
+  bool ok = tryWrite(false) || tryWrite(true);
+  if (ok && (d.type == CHAIN_KEY_TYPE_CODE || d.type == CHAIN_ENCODER_TYPE_CODE || d.type == CHAIN_JOYSTICK_TYPE_CODE)) {
+    String multi = serializeKeyMessages(d);
+    if (!prefs.begin("keymulti", false)) {
+      STORAGE_LOG("SAVE keymulti begin failed: uid=%s", d.uid.c_str());
+      return false;
+    }
+    size_t wrote = prefs.putString(key.c_str(), multi);
+    String verify = prefs.getString(key.c_str(), "");
+    prefs.end();
+    ok = wrote > 0 && verify == multi;
+    STORAGE_LOG("SAVE keymulti result: uid=%s key=%s wrote=%u readLen=%u expected=%u match=%d", d.uid.c_str(), key.c_str(), (unsigned)wrote, (unsigned)verify.length(), (unsigned)multi.length(), ok ? 1 : 0);
+  }
+  if (ok) registerKnownDevice(d.uid, d.displayName, d.type);
+  STORAGE_LOG("SAVE end: uid=%s ok=%d", d.uid.c_str(), ok ? 1 : 0);
+  return ok;
 }
 
 void deleteDeviceSettingsByUid(const String& uid) {
   if (!uid.length()) return;
   if (!isPlaceholderUid(uid)) {
+    const String cfgKey = deviceCfgKey(uid);
+    const String nameKey = deviceNameKey(uid);
+    const String legacyCfgKey = deviceCfgKeyLegacy(uid);
+    const String legacyNameKey = deviceNameKeyLegacy(uid);
+    bool cfgKeyShared = false;
+    bool nameKeyShared = false;
+    bool legacyCfgKeyShared = false;
+    bool legacyNameKeyShared = false;
+    auto checkOtherUid = [&](const String& otherUid) {
+      if (!otherUid.length() || otherUid == uid || isPlaceholderUid(otherUid)) return;
+      if (deviceCfgKey(otherUid) == cfgKey) cfgKeyShared = true;
+      if (deviceNameKey(otherUid) == nameKey) nameKeyShared = true;
+      if (deviceCfgKeyLegacy(otherUid) == legacyCfgKey) legacyCfgKeyShared = true;
+      if (deviceNameKeyLegacy(otherUid) == legacyNameKey) legacyNameKeyShared = true;
+    };
+    for (int i = 0; i < MAX_KNOWN; i++)
+      if (knownDevices[i].used) checkOtherUid(knownDevices[i].uid);
+    for (int i = 0; i < deviceCount; i++)
+      if (devices[i].active) checkOtherUid(devices[i].uid);
+
     prefs.begin("devcfg", false);
-    prefs.remove(deviceCfgKey(uid).c_str());
-    prefs.remove(deviceNameKey(uid).c_str());
-    prefs.remove(deviceCfgKeyLegacy(uid).c_str());
-    prefs.remove(deviceNameKeyLegacy(uid).c_str());
+    if (!cfgKeyShared) prefs.remove(cfgKey.c_str());
+    if (!nameKeyShared) prefs.remove(nameKey.c_str());
+    // The legacy keys use only the UID suffix and are not guaranteed unique.
+    if (!legacyCfgKeyShared) prefs.remove(legacyCfgKey.c_str());
+    if (!legacyNameKeyShared) prefs.remove(legacyNameKey.c_str());
     prefs.end();
+    if (prefs.begin("keymulti", false)) {
+      if (!cfgKeyShared) prefs.remove(cfgKey.c_str());
+      prefs.end();
+    }
   }
   unregisterKnownDevice(uid);
   for (int i = 0; i < deviceCount; i++) {
@@ -516,6 +727,7 @@ void resetAllSettings() {
   prefs.begin("osc", false); prefs.clear(); prefs.end();
   prefs.begin("devcfg", false); prefs.clear(); prefs.end();
   prefs.begin("keycfg", false); prefs.clear(); prefs.end();
+  prefs.begin("keymulti", false); prefs.clear(); prefs.end();
   prefs.begin("ui", false); prefs.clear(); prefs.end();
   prefs.begin("known", false); prefs.clear(); prefs.end();
   delay(1000);

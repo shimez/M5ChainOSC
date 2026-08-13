@@ -45,12 +45,12 @@ void pollEncoder(ChainDevice& d) {
       }
     } else if (st == 1) {
       M5Chain.setRGBValue(d.chainId, 0, 1, color_red, 3, &operation_status);
-      sendOSC(d.enc.press);
-      showOscFeedback(deviceDisplayName(d), d.enc.press.address, d.enc.press.valueStr);
+      for(uint8_t i=0;i<d.enc.pressMessageCount;i++) sendOSC(d.enc.pressMessages[i]);
+      if(d.enc.pressMessageCount){const OSCMessage& m=d.enc.pressMessages[d.enc.pressMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     } else {
       M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
-      sendOSC(d.enc.release);
-      showOscFeedback(deviceDisplayName(d), d.enc.release.address, d.enc.release.valueStr);
+      for(uint8_t i=0;i<d.enc.releaseMessageCount;i++) sendOSC(d.enc.releaseMessages[i]);
+      if(d.enc.releaseMessageCount){const OSCMessage& m=d.enc.releaseMessages[d.enc.releaseMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     }
     d.lastButtonStatus = st;
   }
@@ -118,12 +118,12 @@ void pollJoystick(ChainDevice& d) {
       }
     } else if (st == 1) {
       M5Chain.setRGBValue(d.chainId, 0, 1, color_red, 3, &operation_status);
-      sendOSC(d.joy.press);
-      showOscFeedback(deviceDisplayName(d), d.joy.press.address, d.joy.press.valueStr);
+      for(uint8_t i=0;i<d.joy.pressMessageCount;i++) sendOSC(d.joy.pressMessages[i]);
+      if(d.joy.pressMessageCount){const OSCMessage& m=d.joy.pressMessages[d.joy.pressMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     } else {
       M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
-      sendOSC(d.joy.release);
-      showOscFeedback(deviceDisplayName(d), d.joy.release.address, d.joy.release.valueStr);
+      for(uint8_t i=0;i<d.joy.releaseMessageCount;i++) sendOSC(d.joy.releaseMessages[i]);
+      if(d.joy.releaseMessageCount){const OSCMessage& m=d.joy.releaseMessages[d.joy.releaseMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     }
     d.lastButtonStatus = st;
   }
@@ -205,12 +205,18 @@ void pollAllDevices() {
         }
       } else if (st == 1) {
         M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_red, 3, &operation_status);
-        sendOSC(devices[i].press);
-        showOscFeedback(deviceDisplayName(devices[i]), devices[i].press.address, devices[i].press.valueStr);
+        for (uint8_t m = 0; m < devices[i].pressMessageCount; m++) sendOSC(devices[i].pressMessages[m]);
+        if (devices[i].pressMessageCount > 0) {
+          const OSCMessage& last = devices[i].pressMessages[devices[i].pressMessageCount - 1];
+          showOscFeedback(deviceDisplayName(devices[i]), last.address, last.valueStr);
+        }
       } else {
         M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_blue, 3, &operation_status);
-        sendOSC(devices[i].release);
-        showOscFeedback(deviceDisplayName(devices[i]), devices[i].release.address, devices[i].release.valueStr);
+        for (uint8_t m = 0; m < devices[i].releaseMessageCount; m++) sendOSC(devices[i].releaseMessages[m]);
+        if (devices[i].releaseMessageCount > 0) {
+          const OSCMessage& last = devices[i].releaseMessages[devices[i].releaseMessageCount - 1];
+          showOscFeedback(deviceDisplayName(devices[i]), last.address, last.valueStr);
+        }
       }
       devices[i].lastButtonStatus = st;
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
@@ -275,9 +281,15 @@ bool refreshChainDevices(bool force) {
       if (M5Chain.getUID(d.chainId, UID_TYPE_12_BYTE, uid, 12, &operation_status) == CHAIN_OK) {
         d.uid = uidToString(uid, 12);
         d.uidShort = d.uid.substring(d.uid.length() - 8);
+#if M5CHAINOSC_STORAGE_DEBUG
+        Serial.printf("[M5OSC][CHAIN] ENUM id=%u type=%d uid=%s\n", d.chainId, (int)d.type, d.uid.c_str());
+#endif
       } else {
         d.uid = "POS_" + String(d.chainId);
         d.uidShort = d.uid;
+#if M5CHAINOSC_STORAGE_DEBUG
+        Serial.printf("[M5OSC][CHAIN] ENUM UID FAILED id=%u type=%d placeholder=%s status=%d\n", d.chainId, (int)d.type, d.uid.c_str(), (int)operation_status);
+#endif
       }
 
       if (!isPlaceholderUid(d.uid)) {

@@ -41,6 +41,10 @@ struct EncoderOscConfig {
   KeyMode        clickMode     = MODE_PRESS_RELEASE;
   OSCMessage     press;
   OSCMessage     release;
+  OSCMessage     pressMessages[MAX_KEY_OSC_MESSAGES];
+  OSCMessage     releaseMessages[MAX_KEY_OSC_MESSAGES];
+  uint8_t        pressMessageCount = 1;
+  uint8_t        releaseMessageCount = 1;
   SequenceConfig clickSeq;
 };
 
@@ -61,6 +65,10 @@ struct JoystickOscConfig {
   KeyMode        clickMode = MODE_PRESS_RELEASE;
   OSCMessage     press;
   OSCMessage     release;
+  OSCMessage     pressMessages[MAX_KEY_OSC_MESSAGES];
+  OSCMessage     releaseMessages[MAX_KEY_OSC_MESSAGES];
+  uint8_t        pressMessageCount = 1;
+  uint8_t        releaseMessageCount = 1;
   SequenceConfig clickSeq;
 };
 
@@ -84,6 +92,10 @@ struct ChainDevice {
   KeyMode        mode = MODE_PRESS_RELEASE;
   OSCMessage     press;
   OSCMessage     release;
+  OSCMessage     pressMessages[MAX_KEY_OSC_MESSAGES];
+  OSCMessage     releaseMessages[MAX_KEY_OSC_MESSAGES];
+  uint8_t        pressMessageCount = 1;
+  uint8_t        releaseMessageCount = 1;
   SequenceConfig seq;
 
   EncoderOscConfig  enc;
