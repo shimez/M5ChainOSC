@@ -5,7 +5,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 主にVRChatのアバターパラメーター操作を想定していますが、OSCを受信できるアプリケーションで利用できます。
 
 > [!NOTE]
-> Chain ToF対応は実装されていますが、このブランチでは実機検証中の機能として扱っています。
+> Chain ToFを含む対応デバイスは実機での動作確認を行っています。
 
 ## 主な機能
 
@@ -30,7 +30,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 - Chain Encoder
 - Chain Angle
 - Chain Joystick
-- Chain ToF（実機検証中）
+- Chain ToF
 
 ## 必要なライブラリ
 
@@ -82,14 +82,14 @@ pio device monitor -b 115200
 
 `M5ChainOSC.ino`はArduino IDE用のエントリーポイントです。共通実装は`src/`以下にあります。
 
-## Preview Web Installer
+## Web Installer
 
-開発中のファームウェアは、[M5ChainOSC Preview Web Installer](https://shimez.github.io/M5ChainOSC/installer/preview/)からブラウザ経由でAtomS3Rへ書き込めます。
+正式版ファームウェアは、[M5ChainOSC Web Installer](https://shimez.github.io/M5ChainOSC/installer/)からブラウザ経由でAtomS3Rへ書き込めます。
 
 > [!WARNING]
-> Preview版には実機検証前の機能が含まれる場合があります。インストール前に設定JSONをバックアップし、Installer画面に記載された注意事項を確認してください。
+> 再インストールや消去を行う前に、必要な設定をJSONでバックアップし、Installer画面に記載された注意事項を確認してください。
 
-Web Installerの構成とローカル確認方法は、[Preview Installer README](docs/installer/preview/README.md)を参照してください。
+Web Installerの構成とローカル確認方法は、[Installer README](docs/installer/README.md)を参照してください。
 
 ## 設定のバックアップ
 
@@ -139,7 +139,7 @@ src/
   osc_send.*            OSC送信
 docs/
   USER_GUIDE_ja.md      日本語ユーザーガイド
-  installer/preview/    Preview Web Installer
+  installer/            正式版Web Installer
 presets/
   README.md              デバイスプリセット一覧と使用方法
   joystick/              Joystick用プリセット
