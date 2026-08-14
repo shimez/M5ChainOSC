@@ -129,6 +129,66 @@ void pollJoystick(ChainDevice& d) {
   }
 }
 
+static bool configureTof(ChainDevice& d) {
+  uint8_t status = 0;
+  chain_status_t result =
+      M5Chain.setToFMeasureMode(d.chainId, CHAIN_TOF_MODE_CONTINUOUS, &status);
+  if (result != CHAIN_OK || status == 0) return false;
+
+  status = 0;
+  result = M5Chain.setToFMeasureTime(d.chainId, 50, &status);
+  return (result == CHAIN_OK && status != 0);
+}
+
+void pollTof(ChainDevice& d) {
+  const uint32_t now = millis();
+
+  // Retry configuration if previous attempt failed (every 2s)
+  if (!d.tofConfigured) {
+    if (d.lastTofConfigMs != 0 && (now - d.lastTofConfigMs) < 2000) return;
+    d.lastTofConfigMs = now;
+    if (!configureTof(d)) return;
+    d.tofConfigured = true;
+    d.tofInited = false;
+  }
+
+  // Match ~50ms measurement period; avoid flooding the Chain UART
+  static const uint32_t TOF_POLL_INTERVAL_MS = 50;
+  if (d.lastTofPollMs != 0 && (now - d.lastTofPollMs) < TOF_POLL_INTERVAL_MS) return;
+  d.lastTofPollMs = now;
+
+  uint16_t mm = 0;
+  // Default API timeout is 100ms; keep short so a stuck read does not block the loop
+  constexpr unsigned long TOF_READ_TIMEOUT_MS = 30;
+  if (M5Chain.getToFDistance(d.chainId, &mm, TOF_READ_TIMEOUT_MS) != CHAIN_OK) {
+    if (++d.tofReadFailures >= 5) {
+      d.tofReadFailures = 0;
+      d.tofConfigured = false;
+      d.tofInited = false;
+    }
+    return;
+  }
+  d.tofReadFailures = 0;
+
+  // uint16_t cannot be negative; treat >3000 as invalid / out of useful range
+  if (mm > 3000) return;
+  const int val = static_cast<int>(mm);
+
+  bool firstValue = !d.tofInited;
+  if (firstValue) {
+    d.tofInited = true;
+  } else if (abs(val - d.lastTofMm) < max(1, d.tof.deadband)) {
+    return;
+  }
+  d.lastTofMm = val;
+
+  d.tof.map.inMin = 30;
+  d.tof.map.inMax = 2000;
+  float mapped = mapClamped((float)val, d.tof.map.inMin, d.tof.map.inMax,
+                            d.tof.map.outMin, d.tof.map.outMax);
+  sendMappedOsc(deviceDisplayName(d), d.tof.addr, mapped, d.tof.map.outType);
+}
+
 void pollAllDevices() {
   for (int i = 0; i < deviceCount; i++) {
     if (!devices[i].active) continue;
@@ -159,6 +219,8 @@ void pollAllDevices() {
       pollAngle(devices[i]);
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
       pollJoystick(devices[i]);
+    } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
+      pollTof(devices[i]);
     }
   }
 }
@@ -252,6 +314,15 @@ bool refreshChainDevices(bool force) {
         M5Chain.getEncoderButtonStatus(devices[i].chainId, &devices[i].lastButtonStatus);
       else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE)
         M5Chain.getJoystickButtonStatus(devices[i].chainId, &devices[i].lastButtonStatus);
+      else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
+        devices[i].tofInited = false;
+        devices[i].tofConfigured = false;
+        devices[i].lastTofMm = -1;
+        devices[i].lastTofPollMs = 0;
+        devices[i].lastTofConfigMs = 0;
+        devices[i].tofReadFailures = 0;
+        // Actual setToFMeasureMode/Time runs in pollTof with retry on failure
+      }
     }
     if (!isAPMode && !resetInProgress) drawMainScreen();
   }

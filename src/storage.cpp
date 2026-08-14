@@ -73,8 +73,18 @@ void setDefaultDeviceMessages(ChainDevice& d) {
   d.joy.release   = {"/avatar/parameters/JoyClick", "0.0", TYPE_FLOAT};
   d.joy.clickSeq  = {"/avatar/parameters/JoySeq", TYPE_FLOAT, 0, 10, 1, 0};
 
+  d.tof.addr     = "/avatar/parameters/ToF";
+  d.tof.deadband = 5;
+  d.tof.map      = {30, 2000, 0, 1, TYPE_FLOAT};
+
   d.encInited = false;
   d.joyInited = false;
+  d.tofInited = false;
+  d.tofConfigured = false;
+  d.lastTofMm = -1;
+  d.lastTofPollMs = 0;
+  d.lastTofConfigMs = 0;
+  d.tofReadFailures = 0;
   d.lastAngle = -99999;
   d.lastButtonStatus = 0;
 }
@@ -132,6 +142,11 @@ String serializeDeviceConfig(const ChainDevice& d) {
   appendField(o, d.joy.release.address); appendField(o, d.joy.release.valueStr); appendField(o, (int)d.joy.release.valueType);
   appendField(o, d.joy.clickSeq.address); appendField(o, (int)d.joy.clickSeq.valueType);
   appendField(o, d.joy.clickSeq.start); appendField(o, d.joy.clickSeq.end); appendField(o, d.joy.clickSeq.step);
+
+  appendField(o, d.tof.addr);
+  appendField(o, d.tof.deadband);
+  appendField(o, d.tof.map.outMin); appendField(o, d.tof.map.outMax);
+  appendField(o, (int)d.tof.map.outType);
   return o;
 }
 
@@ -199,6 +214,18 @@ void applySerializedConfig(ChainDevice& d, const String& blob) {
     d.joy.release.address = s(); d.joy.release.valueStr = s(); d.joy.release.valueType = (ValueType)asInt();
     d.joy.clickSeq.address = s(); d.joy.clickSeq.valueType = (ValueType)asInt();
     d.joy.clickSeq.start = asFloat(); d.joy.clickSeq.end = asFloat(); d.joy.clickSeq.step = asFloat();
+  }
+
+  // ToF (optional trailing fields — older blobs omit these)
+  {
+    String ta = s();
+    if (ta.length()) {
+      d.tof.addr = ta;
+      d.tof.deadband = asInt();
+      d.tof.map.outMin = asFloat();
+      d.tof.map.outMax = asFloat();
+      d.tof.map.outType = (ValueType)asInt();
+    }
   }
 }
 
@@ -282,6 +309,8 @@ void loadDeviceSettings(ChainDevice& d) {
   d.enc.map.inMax = d.enc.absInMax;
   d.joy.map.inMin = -127;
   d.joy.map.inMax = 127;
+  d.tof.map.inMin = 30;
+  d.tof.map.inMax = 2000;
 }
 
 void saveDeviceSettings(const ChainDevice& d) {

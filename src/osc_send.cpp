@@ -22,9 +22,16 @@ void sendOSC(const OSCMessage& m) {
 }
 
 void sendMappedOsc(const String& name, const String& addr, float mapped, ValueType type) {
-  sendOSCValue(addr, type, mapped);
-  String vs = (type == TYPE_INT) ? String((int)lroundf(mapped)) : String(mapped, 3);
-  showOscFeedback(name, addr, vs);
+  String valueText =
+      (type == TYPE_INT) ? String((int)lroundf(mapped)) : String(mapped, 3);
+
+  if (type == TYPE_STRING) {
+    // Numeric sensors may still select String in older configs — send the number as text
+    sendOSCValue(addr, TYPE_STRING, 0, valueText);
+  } else {
+    sendOSCValue(addr, type, mapped);
+  }
+  showOscFeedback(name, addr, valueText);
 }
 
 void handleSequencePress(SequenceConfig& seq, const String& name) {
