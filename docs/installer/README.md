@@ -2,6 +2,9 @@
 
 M5ChainOSCの正式版ファームウェアをAtomS3Rへブラウザから書き込むためのWeb Installerです。
 
+> [!IMPORTANT]
+> M5ChainOSCは個人が開発する非公式プロジェクトです。M5Stack Technology Co., Ltd.による公式製品ではなく、同社との提携または承認を示すものではありません。
+
 ## 公開URL
 
 ```text

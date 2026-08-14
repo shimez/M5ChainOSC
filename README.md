@@ -4,6 +4,9 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 
 主にVRChatのアバターパラメーター操作を想定していますが、OSCを受信できるアプリケーションで利用できます。
 
+> [!IMPORTANT]
+> M5ChainOSCは個人が開発する非公式プロジェクトです。M5Stack Technology Co., Ltd.による公式製品ではなく、同社との提携または承認を示すものではありません。
+
 > [!NOTE]
 > Chain ToFを含む対応デバイスは実機での動作確認を行っています。
 

@@ -2,6 +2,9 @@
 
 M5ChainOSCで利用できる、Chainデバイス単体の設定サンプルです。
 
+> [!IMPORTANT]
+> M5ChainOSCは個人が開発する非公式プロジェクトです。M5Stack Technology Co., Ltd.による公式製品ではなく、同社との提携または承認を示すものではありません。
+
 各プリセットはUIDとDevice Nameを含まないため、同じ種類の別のChainデバイスへインポートして利用できます。
 
 ## 使い方
