@@ -161,11 +161,13 @@ Chain ToFの距離をOSCへ変換します。
 
 - `Address`: 距離値の送信先
 - `Deadband (mm)`: 距離変化を送信する最小差
-- `Out Min / Max`: 30～2000 mmの入力範囲に対応する出力値
+- `Maximum Distance (mm)`: OSC送信に使用する最大距離（31～2000 mm）
+- `Output Direction`: 近づけたときに`Out Min`／`Out Max`のどちらへ変化させるか
+- `Out Min / Max`: 有効な距離範囲に対応する出力値
 - `Out Type`: `Float`または`Int`
 
 > [!NOTE]
-> ToF対応は実装されていますが、このブランチでは実機検証中です。検証前の利用では、測定範囲や安定性を確認してください。
+> 有効範囲は30 mm以上、`Maximum Distance`未満です。手を離した場合など、測定値が有効範囲外になるとOSC送信を停止します。有効範囲へ戻ると送信を再開します。
 
 ## 11. 設定のバックアップと復元
 

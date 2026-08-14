@@ -200,6 +200,8 @@ static String deviceJson(const ChainDevice& device, bool includeIdentity = true)
   } else if (device.type == CHAIN_TOF_TYPE_CODE) {
     out += ",\"tof\":{\"address\":" + jsonString(device.tof.addr) +
            ",\"deadband\":" + String(device.tof.deadband) +
+           ",\"maxDistanceMm\":" + String(device.tof.maxDistanceMm) +
+           ",\"nearValueHigh\":" + String(device.tof.nearValueHigh ? "true" : "false") +
            ",\"range\":" + rangeJson(device.tof.map) + "}";
   }
   out += '}';
@@ -323,7 +325,18 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device, String& 
     JsonObjectConst v = object["tof"].as<JsonObjectConst>();
     if (v.isNull() || !jsonAddress(v["address"], device.tof.addr, error)) return false;
     device.tof.deadband = v["deadband"] | 5;
+    device.tof.maxDistanceMm = v["maxDistanceMm"] | 2000;
+    device.tof.nearValueHigh = v["nearValueHigh"] | false;
+    if (device.tof.deadband < 1 || device.tof.deadband > 2000 ||
+        device.tof.maxDistanceMm < 31 || device.tof.maxDistanceMm > 2000) {
+      error = "ToF distance or deadband is out of range."; return false;
+    }
     if (!jsonRange(v["range"].as<JsonObjectConst>(), device.tof.map, error)) return false;
+    if (device.tof.map.outType != TYPE_FLOAT && device.tof.map.outType != TYPE_INT) {
+      error = "ToF output type must be Float or Int."; return false;
+    }
+    device.tof.map.inMin = 30;
+    device.tof.map.inMax = device.tof.maxDistanceMm;
   } else { error = "Unsupported device type."; return false; }
   if (deviceConfigStorageBytes(device) > MAX_DEVICE_CONFIG_BYTES) { error = "Device configuration is too large."; return false; }
   return true;
@@ -565,10 +578,14 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
       html += "<div class='ang'><strong>ToF Distance (mm)</strong>";
       html += "<label>Address</label><input name='fa_" + idx + "' value='" + htmlEscape(devices[i].tof.addr) + "'>";
       html += "<label>Deadband (mm)</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
+      html += "<label>Maximum Distance (mm)</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'>";
+      html += "<label>Output Direction</label><select name='fi_" + idx + "'>";
+      html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">Near → Out Min / Far → Out Max</option>";
+      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">Near → Out Max / Far → Out Min</option></select>";
       html += "<label>Out Min</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'>";
       html += "<label>Out Max</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'>";
       html += "<label>Out Type</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType);
-      html += "<p class='note'>Input range fixed: 30–2000 mm → mapped to Out Min/Max</p></div>";
+      html += "<p class='note'>Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.</p></div>";
     } else {
       html += "<p class='note'>Type code: " + String((int)devices[i].type) + "</p>";
     }
@@ -715,21 +732,34 @@ void handleSave() {
       if (server.hasArg("jl_" + idx)) devices[i].joy.clickSeq.valueType = (ValueType)server.arg("jl_" + idx).toInt();
       normalizeSequence(devices[i].joy.clickSeq);
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
-      if (server.hasArg("fa_" + idx)) {
-        String a = server.arg("fa_" + idx);
-        a.trim();
-        if (a.length() && a.startsWith("/")) devices[i].tof.addr = a;
+      TofOscConfig candidate = devices[i].tof;
+      if (server.hasArg("fa_" + idx)) candidate.addr = server.arg("fa_" + idx);
+      candidate.addr.trim();
+      String validationError;
+      if (!validOscAddressText(candidate.addr, validationError)) {
+        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>ToF Address: " + htmlEscape(validationError) + "</p><p><a href='/'>Back</a></p>"); return;
       }
-      if (server.hasArg("fd_" + idx)) {
-        int db = server.arg("fd_" + idx).toInt();
-        devices[i].tof.deadband = constrain(db, 1, 2000);
+      if (server.hasArg("fd_" + idx)) candidate.deadband = server.arg("fd_" + idx).toInt();
+      if (server.hasArg("fm_" + idx)) candidate.maxDistanceMm = server.arg("fm_" + idx).toInt();
+      candidate.nearValueHigh = server.hasArg("fi_" + idx) && server.arg("fi_" + idx).toInt() != 0;
+      if (candidate.deadband < 1 || candidate.deadband > 2000 ||
+          candidate.maxDistanceMm < 31 || candidate.maxDistanceMm > 2000) {
+        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>ToF Maximum Distance must be 31–2000 mm and Deadband must be 1–2000 mm.</p><p><a href='/'>Back</a></p>"); return;
       }
-      if (server.hasArg("fo_" + idx)) devices[i].tof.map.outMin = server.arg("fo_" + idx).toFloat();
-      if (server.hasArg("fO_" + idx)) devices[i].tof.map.outMax = server.arg("fO_" + idx).toFloat();
+      if (server.hasArg("fo_" + idx)) candidate.map.outMin = server.arg("fo_" + idx).toFloat();
+      if (server.hasArg("fO_" + idx)) candidate.map.outMax = server.arg("fO_" + idx).toFloat();
       if (server.hasArg("ft_" + idx)) {
         int t = server.arg("ft_" + idx).toInt();
-        devices[i].tof.map.outType = (t == TYPE_INT) ? TYPE_INT : TYPE_FLOAT;
+        candidate.map.outType = (t == TYPE_INT) ? TYPE_INT : TYPE_FLOAT;
       }
+      if (!isfinite(candidate.map.outMin) || !isfinite(candidate.map.outMax)) {
+        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>ToF output range is invalid.</p><p><a href='/'>Back</a></p>"); return;
+      }
+      candidate.map.inMin = 30;
+      candidate.map.inMax = candidate.maxDistanceMm;
+      devices[i].tof = candidate;
+      devices[i].tofInited = false;
+      devices[i].lastTofMm = -1;
     }
 
     if (!isPlaceholderUid(devices[i].uid) && !saveDeviceSettings(devices[i])) {

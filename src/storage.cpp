@@ -134,6 +134,8 @@ void setDefaultDeviceMessages(ChainDevice& d) {
 
   d.tof.addr     = "/avatar/parameters/ToF";
   d.tof.deadband = 5;
+  d.tof.maxDistanceMm = 2000;
+  d.tof.nearValueHigh = false;
   d.tof.map      = makeRangeMap(30, 2000, 0, 1, TYPE_FLOAT);
 
   d.encInited = false;
@@ -290,6 +292,8 @@ String serializeDeviceConfig(const ChainDevice& d) {
   appendField(o, d.tof.deadband);
   appendField(o, d.tof.map.outMin); appendField(o, d.tof.map.outMax);
   appendField(o, (int)d.tof.map.outType);
+  appendField(o, d.tof.maxDistanceMm);
+  appendField(o, d.tof.nearValueHigh ? 1 : 0);
 
   return o;
 }
@@ -375,6 +379,10 @@ void applySerializedConfig(ChainDevice& d, const String& blob) {
       d.tof.map.outMin = asFloat();
       d.tof.map.outMax = asFloat();
       d.tof.map.outType = (ValueType)asInt();
+      String maxDistance = s();
+      if (maxDistance.length()) d.tof.maxDistanceMm = constrain(maxDistance.toInt(), 31, 2000);
+      String nearValueHigh = s();
+      if (nearValueHigh.length()) d.tof.nearValueHigh = nearValueHigh.toInt() != 0;
     }
   }
 
@@ -514,7 +522,8 @@ void loadDeviceSettings(ChainDevice& d) {
   d.joy.map.inMin = -127;
   d.joy.map.inMax = 127;
   d.tof.map.inMin = 30;
-  d.tof.map.inMax = 2000;
+  d.tof.maxDistanceMm = constrain(d.tof.maxDistanceMm, 31, 2000);
+  d.tof.map.inMax = d.tof.maxDistanceMm;
 }
 
 bool saveDeviceSettings(const ChainDevice& d) {

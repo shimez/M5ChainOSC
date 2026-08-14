@@ -73,9 +73,11 @@ struct JoystickOscConfig {
 };
 
 struct TofOscConfig {
-  String   addr     = "/avatar/parameters/ToF";
-  int      deadband = 5;   // mm
-  RangeMap map;            // in: 30–2000 mm → out: configurable
+  String   addr          = "/avatar/parameters/ToF";
+  int      deadband      = 5;     // mm
+  int      maxDistanceMm = 2000;  // exclusive active-range upper bound
+  bool     nearValueHigh = false; // false: near=Out Min, true: near=Out Max
+  RangeMap map;                   // in: 30–maxDistanceMm → out: configurable
 };
 
 // ---------------------------------------------------------------------------

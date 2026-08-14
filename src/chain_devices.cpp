@@ -170,8 +170,14 @@ void pollTof(ChainDevice& d) {
   }
   d.tofReadFailures = 0;
 
-  // uint16_t cannot be negative; treat >3000 as invalid / out of useful range
-  if (mm > 3000) return;
+  // Outside the configured active range means "no target" for OSC.
+  // Reset initialization so the first valid value after re-entry is sent.
+  const int maxDistanceMm = constrain(d.tof.maxDistanceMm, 31, 2000);
+  if (mm < 30 || mm >= maxDistanceMm) {
+    d.tofInited = false;
+    d.lastTofMm = -1;
+    return;
+  }
   const int val = static_cast<int>(mm);
 
   bool firstValue = !d.tofInited;
@@ -183,9 +189,12 @@ void pollTof(ChainDevice& d) {
   d.lastTofMm = val;
 
   d.tof.map.inMin = 30;
-  d.tof.map.inMax = 2000;
-  float mapped = mapClamped((float)val, d.tof.map.inMin, d.tof.map.inMax,
-                            d.tof.map.outMin, d.tof.map.outMax);
+  d.tof.map.inMax = maxDistanceMm;
+  const float mapped = d.tof.nearValueHigh
+      ? mapClamped((float)val, d.tof.map.inMin, d.tof.map.inMax,
+                   d.tof.map.outMax, d.tof.map.outMin)
+      : mapClamped((float)val, d.tof.map.inMin, d.tof.map.inMax,
+                   d.tof.map.outMin, d.tof.map.outMax);
   sendMappedOsc(deviceDisplayName(d), d.tof.addr, mapped, d.tof.map.outType);
 }
 

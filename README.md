@@ -22,6 +22,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 - ボタンを押すたびに値を進めるSequenceモード
 - 設定のJSONエクスポート／インポート
 - UIDを含まないデバイス単体プリセットのJSON共有
+- Chain ToFの最大距離、範囲外送信停止、出力方向設定
 - 画面回転
 - Arduino IDEとPlatformIOの両方に対応
 

@@ -27,6 +27,7 @@ Version 2ではEncoder／Joystickのクリック`press`・`release`を、Keyと�
 - 保存済みデバイスのUID、種類、表示名
 - デバイス種類別のOSC設定
 - Chain KeyのPress、Release、Sequence設定
+- Chain ToFの最大距離、出力方向、出力範囲設定
 
 Wi-FiのSSIDとパスワードは含めません。`wifiCredentialsIncluded`は常に`false`です。
 
