@@ -43,3 +43,28 @@ Wi-FiのSSIDとパスワードは含めません。`wifiCredentialsIncluded`は�
 - Wi-Fi設定は変更しない
 
 現在のアップロード上限は48 KiBです。
+
+## デバイス設定プリセット
+
+デバイス設定プリセットは、本体全体のバックアップとは別形式です。接続中のChainデバイス単体の設定を、同じ種類の別個体へ共有するために使用します。
+
+```json
+{
+  "format": "M5ChainOSC-device-preset",
+  "schemaVersion": 1,
+  "deviceType": 3,
+  "deviceTypeName": "Key",
+  "key": {
+    "mode": 0,
+    "press": [],
+    "release": [],
+    "sequence": {}
+  }
+}
+```
+
+- UIDとDevice Nameは含めません。
+- インポート先として選択した接続中デバイスのUIDとDevice Nameを維持します。
+- `deviceType`がインポート先と一致しないプリセットは拒否します。
+- デバイス種類別の各値は、全体バックアップと同じ検証を行います。
+- プリセットのアップロード上限は16 KiBです。

@@ -145,11 +145,19 @@ static String rangeJson(const RangeMap& map) {
          ",\"type\":" + String((int)map.outType) + "}";
 }
 
-static String deviceJson(const ChainDevice& device) {
-  String out = String("{\"uid\":") + jsonString(device.uid) +
-               ",\"deviceType\":" + String((int)device.type) +
-               ",\"deviceTypeName\":" + jsonString(String(typeToName(device.type))) +
-               ",\"displayName\":" + jsonString(device.displayName);
+static String deviceJson(const ChainDevice& device, bool includeIdentity = true) {
+  String out = "{";
+  if (includeIdentity) {
+    out += String("\"uid\":") + jsonString(device.uid) +
+           ",\"deviceType\":" + String((int)device.type) +
+           ",\"deviceTypeName\":" + jsonString(String(typeToName(device.type))) +
+           ",\"displayName\":" + jsonString(device.displayName);
+  } else {
+    out += String("\"format\":\"M5ChainOSC-device-preset\"") +
+           ",\"schemaVersion\":1" +
+           ",\"deviceType\":" + String((int)device.type) +
+           ",\"deviceTypeName\":" + jsonString(String(typeToName(device.type)));
+  }
   if (device.type == CHAIN_KEY_TYPE_CODE) {
     out += ",\"key\":{\"mode\":" + String((int)device.mode) + ",\"press\":[";
     for (uint8_t i = 0; i < device.pressMessageCount; i++) {
@@ -332,6 +340,8 @@ void registerWebRoutes() {
   server.on("/set_rotation", handleSetRotation);
   server.on("/export_settings", HTTP_GET, handleExportSettings);
   server.on("/import_settings", HTTP_POST, handleImportSettings);
+  server.on("/export_device_preset", HTTP_GET, handleExportDevicePreset);
+  server.on("/import_device_preset", HTTP_POST, handleImportDevicePreset);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,7 +378,7 @@ void handleRoot() {
 body{font-family:sans-serif;margin:16px;background:#f5f5f5}
 .card{background:#fff;padding:16px;border-radius:10px;margin-bottom:16px;box-shadow:0 2px 5px rgba(0,0,0,.1)}
 .saved-settings{margin-top:28px}
-.backup-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.backup-grid .card{margin-bottom:16px;display:flex;flex-direction:column}.backup-grid form,.backup-grid button{margin-top:auto}@media(max-width:720px){.backup-grid{grid-template-columns:1fr}.osc-row{grid-template-columns:52px 1fr}.osc-row .field,.remove-msg{grid-column:2}.key-grid,.seq-grid{grid-template-columns:1fr}.seq-address{grid-column:1}}
+.tool-card .note{margin-bottom:10px}.tool-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tool-row a,.tool-row button{box-sizing:border-box;text-align:center;text-decoration:none;margin:0;padding:11px;border-radius:6px;font-size:15px}.tool-row a{display:block;background:#3267e3;color:#fff}.tool-row button{background:#fff;color:#3267e3;border:1px solid #3267e3}.tool-status{min-height:18px;margin:7px 0 0}@media(max-width:720px){.osc-row{grid-template-columns:52px 1fr}.osc-row .field,.remove-msg{grid-column:2}.key-grid,.seq-grid{grid-template-columns:1fr}.seq-address{grid-column:1}}@media(max-width:520px){.tool-row{grid-template-columns:1fr}}
 h1{font-size:1.4em}h2{margin-top:0;font-size:1.1em}
 label{display:block;margin-top:10px;font-weight:bold;font-size:.9em}
 input,select{width:100%;padding:8px;margin-top:4px;box-sizing:border-box}
@@ -381,6 +391,7 @@ input.invalid,select.invalid{border:2px solid #c73c4a;background:#fff8f8}
 .sequence-card{margin-top:12px;padding:15px;border:1px solid #dce2ea;border-radius:10px;background:#fbfcfe}.seq-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.seq-address{grid-column:1/-1}
 button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-radius:6px;font-size:16px;margin-top:8px}
 .btn-danger{background:#dc3545}.btn-warning{background:#ff9800}.btn-export{background:#3267e3}.btn-rot{background:#6f42c1;flex:1;margin:0}
+.device{position:relative}.device-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}.device-head h2{margin-bottom:0}.device-menu-wrap{position:relative;flex:0 0 auto}.more-button{width:34px;height:30px;margin:0;padding:0;background:#f1f4f8;color:#42516a;border:1px solid #dce2ea;border-radius:7px;font-size:18px;line-height:1}.device-menu{display:none;position:absolute;z-index:20;right:0;top:36px;width:235px;padding:8px;background:#fff;border:1px solid #dce2ea;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18)}.device-menu.open{display:block}.device-menu a,.device-menu button{display:block;box-sizing:border-box;width:100%;margin:0;padding:10px;text-align:left;text-decoration:none;border-radius:7px;background:#fff;color:#253550;border:0;font-size:14px}.device-menu a:hover,.device-menu button:hover{background:#edf3ff}.device-menu .menu-note{padding:6px 10px 8px;color:#7a8494;font-size:12px}.preset-status{min-height:18px;margin:5px 10px;color:#666;font-size:12px}
 .btn-rot-cur{background:#9b59b6;font-weight:bold;box-shadow:inset 0 0 0 2px #fff}
 .rot-row{display:flex;gap:8px;margin-top:10px}
 .press{border-left:5px solid #dc3545;padding-left:10px;margin-top:12px}
@@ -416,7 +427,13 @@ function limitBytes(i,max){while(bytes(i.value)>max)i.value=i.value.slice(0,-1)}
 function limitAndValidate(i,max){limitBytes(i,max);validateInput(i)}
 function validateInput(i){let max=i.classList.contains('msg-address')?192:128,b=bytes(i.value),err='';if(i.classList.contains('msg-address')){if(!i.value)err='Required';else if(i.value[0]!='/')err='Start with /';else if(/[\s#*,?\[\]{}]/.test(i.value))err='Invalid character'}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err='Invalid float';if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err='Invalid integer'}if(b>max)err='Too long';i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
 function validateForm(){let ok=true;document.querySelectorAll('.osc-row .msg-address,.osc-row .msg-value').forEach(i=>{if(!validateInput(i))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert('Please correct the highlighted OSC message fields.')}return ok}
-async function importSettings(){let input=document.getElementById('import-file'),status=document.getElementById('import-status');if(!input.files.length){alert('Select a JSON file first.');return}let file=input.files[0];if(file.size>49152){alert('The JSON file is too large.');return}if(!confirm('Import the settings in this file? Matching device settings will be overwritten.'))return;status.textContent='Importing...';try{let body=await file.text(),response=await fetch('/import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),1000)}catch(e){status.textContent='Import failed: '+e.message}}
+async function importSettings(){let input=document.getElementById('import-file'),status=document.getElementById('import-status');if(!input.files.length)return;let file=input.files[0];if(file.size>49152){status.textContent='Import failed: The JSON file is too large.';input.value='';return}if(!confirm('Import the settings in this file? Matching device settings will be overwritten.')){input.value='';return}status.textContent='Importing...';try{let body=await file.text(),response=await fetch('/import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),1000)}catch(e){status.textContent='Import failed: '+e.message}finally{input.value=''}}
+function chooseSettingsFile(){document.getElementById('import-file').click()}
+function closeDeviceMenus(except){document.querySelectorAll('.device-menu.open').forEach(menu=>{if(menu!==except){menu.classList.remove('open');let button=menu.parentNode.querySelector('.more-button');if(button)button.setAttribute('aria-expanded','false')}})}
+function toggleDeviceMenu(event,index){event.stopPropagation();let menu=document.getElementById('device-menu-'+index),opening=!menu.classList.contains('open');closeDeviceMenus(menu);menu.classList.toggle('open',opening);event.currentTarget.setAttribute('aria-expanded',opening?'true':'false')}
+function chooseDevicePreset(index){document.getElementById('preset-file-'+index).click()}
+async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){status.textContent='Import failed: The preset file is too large.';input.value='';return}if(!confirm('Apply this preset to the selected device? Its device settings will be overwritten.')){input.value='';return}status.textContent='Importing preset...';try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),800)}catch(e){status.textContent='Import failed: '+e.message}finally{input.value=''}}
+document.addEventListener('click',()=>closeDeviceMenus());
 window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-row').forEach(r=>{validateInput(r.querySelector('.msg-address'));validateInput(r.querySelector('.msg-value'))});document.querySelectorAll('[id^="count_"]').forEach(x=>renumber(x.id.substring(6)))})
 </script></head><body><h1>Chain OSC (VRChat)</h1>
 )raw";
@@ -425,13 +442,12 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
   html += "<form action='/delete_wifi' method='POST' onsubmit=\"return confirm('Delete WiFi?');\">";
   html += "<button class='btn-danger' type='submit'>Delete WiFi Settings</button></form></div>";
 
-  html += "<div class='backup-grid'><div class='card'><h2>Settings Backup</h2>";
-  html += "<p class='note'>Download saved settings as versioned JSON. WiFi credentials are not included.</p>";
-  html += "<form action='/export_settings' method='GET'><button class='btn-export' type='submit'>Export Settings (JSON)</button></form></div>";
-  html += "<div class='card'><h2>Restore Settings</h2>";
-  html += "<p class='note'>Import a M5ChainOSC settings JSON. Devices in the file overwrite settings with the same UID; other saved devices are kept.</p>";
-  html += "<input id='import-file' type='file' accept='application/json,.json'>";
-  html += "<p id='import-status' class='meta'></p><button class='btn-export' type='button' onclick='importSettings()'>Import Settings (JSON)</button></div></div>";
+  html += "<div class='card tool-card'><h2>Settings Backup &amp; Restore</h2>";
+  html += "<p class='note'>Back up or restore all M5ChainOSC settings as versioned JSON. WiFi credentials are not included.</p>";
+  html += "<input id='import-file' type='file' accept='application/json,.json' hidden onchange='importSettings()'>";
+  html += "<div class='tool-row'><a href='/export_settings'>Export Settings (JSON)</a>";
+  html += "<button type='button' onclick='chooseSettingsFile()'>Import Settings (JSON)</button></div>";
+  html += "<p id='import-status' class='meta tool-status'></p></div>";
 
   html += "<div class='card'><h2>Display Rotation</h2>";
   html += "<p class='meta'>Current: <strong>" + String((int)displayRotation * 90) + "&deg;</strong> (index " + String(displayRotation) + ")</p>";
@@ -461,11 +477,22 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
     bool joySeq = devices[i].joy.clickMode == MODE_SEQUENCE;
     bool ph = isPlaceholderUid(devices[i].uid);
 
-    html += "<div class='card device'><h2>";
+    html += "<div class='card device'><div class='device-head'><h2>";
     html += "<span class='badge badge-type'>" + String(typeToName(devices[i].type)) + "</span>";
     html += " #" + String(devices[i].chainId);
     html += " <span class='badge badge-on'>Connected</span></h2>";
+    if (!ph && devices[i].type != CHAIN_UNKNOWN_TYPE_CODE) {
+      html += "<div class='device-menu-wrap'><button class='more-button' type='button' aria-label='Device menu' aria-expanded='false' onclick='toggleDeviceMenu(event," + idx + ")'>&hellip;</button>";
+      html += "<div id='device-menu-" + idx + "' class='device-menu' onclick='event.stopPropagation()'>";
+      html += "<div class='menu-note'>Device preset (UID and Device Name are not included)</div>";
+      html += "<a href='/export_device_preset?index=" + idx + "' onclick='closeDeviceMenus()'>Export Preset (JSON)</a>";
+      html += "<button type='button' onclick='chooseDevicePreset(" + idx + ")'>Import Preset (JSON)</button>";
+      html += "<p id='preset-status-" + idx + "' class='preset-status'></p></div></div>";
+    }
+    html += "</div>";
     html += "<div class='uid'>" + htmlEscape(devices[i].uid) + "</div>";
+    if (!ph && devices[i].type != CHAIN_UNKNOWN_TYPE_CODE)
+      html += "<input id='preset-file-" + idx + "' type='file' accept='application/json,.json' hidden onchange='importDevicePreset(" + idx + ",this)'>";
     if (ph) html += "<p class='note'>UID取得失敗（仮ID）。設定は保存されません。</p>";
     if (devices[i].type != CHAIN_KEY_TYPE_CODE)
       html += "<label>Device Name</label><input maxlength='64' name='nm_" + idx + "' value='" + htmlEscape(devices[i].displayName) + "' oninput='limitBytes(this,64)'>";
@@ -742,6 +769,103 @@ void handleDeleteDevice() {
   }
   deleteDeviceSettingsByUid(server.arg("uid"));
   server.send(200, "text/html", "<h2>Deleted</h2><p><a href='/'>Back</a></p>");
+}
+
+static int requestedActiveDeviceIndex() {
+  if (!server.hasArg("index")) return -1;
+  String value = server.arg("index");
+  if (!value.length()) return -1;
+  for (size_t i = 0; i < value.length(); i++)
+    if (!isdigit((unsigned char)value[i])) return -1;
+  int index = value.toInt();
+  if (index < 0 || index >= deviceCount || !devices[index].active ||
+      !devices[index].uid.length() || isPlaceholderUid(devices[index].uid)) return -1;
+  return index;
+}
+
+void handleExportDevicePreset() {
+  int index = requestedActiveDeviceIndex();
+  if (index < 0) {
+    server.send(404, "text/plain; charset=utf-8", "The selected connected device was not found.");
+    return;
+  }
+
+  String typeName = String(typeToName(devices[index].type));
+  typeName.replace(" ", "-");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"M5ChainOSC-" + typeName + "-preset.json\"");
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json; charset=utf-8", deviceJson(devices[index], false));
+}
+
+void handleImportDevicePreset() {
+  int index = requestedActiveDeviceIndex();
+  if (index < 0) {
+    server.send(404, "text/plain; charset=utf-8", "The selected connected device was not found.");
+    return;
+  }
+
+  String body = server.arg("plain");
+  if (!body.length()) {
+    server.send(400, "text/plain; charset=utf-8", "Preset file is empty.");
+    return;
+  }
+  if (body.length() > 16384) {
+    server.send(413, "text/plain; charset=utf-8", "Preset file exceeds 16 KiB.");
+    return;
+  }
+
+  DynamicJsonDocument document(24576);
+  DeserializationError parseError = deserializeJson(document, body);
+  body = "";
+  if (parseError) {
+    server.send(400, "text/plain; charset=utf-8", "Invalid JSON: " + String(parseError.c_str()));
+    return;
+  }
+
+  JsonObject root = document.as<JsonObject>();
+  if (root.isNull() || !root["format"].is<const char*>() ||
+      String(root["format"].as<const char*>()) != "M5ChainOSC-device-preset") {
+    server.send(400, "text/plain; charset=utf-8", "This is not an M5ChainOSC device preset.");
+    return;
+  }
+  if (!root["schemaVersion"].is<int>() || root["schemaVersion"].as<int>() != 1) {
+    server.send(400, "text/plain; charset=utf-8", "Unsupported or missing preset schemaVersion.");
+    return;
+  }
+  if (!root["deviceType"].is<int>() ||
+      root["deviceType"].as<int>() != (int)devices[index].type) {
+    server.send(400, "text/plain; charset=utf-8",
+                "Device type mismatch. Select a preset for " + String(typeToName(devices[index].type)) + ".");
+    return;
+  }
+
+  // A preset intentionally has no identity. Bind it only to the device card
+  // selected by the user, while preserving that device's local name.
+  root["uid"] = devices[index].uid;
+  root["displayName"] = devices[index].displayName;
+
+  ChainDevice* candidate = new (std::nothrow) ChainDevice();
+  if (!candidate) {
+    server.send(503, "text/plain; charset=utf-8", "Not enough memory to validate the preset.");
+    return;
+  }
+  String validationError;
+  JsonObjectConst presetObject = root;
+  if (!deviceFromJson(presetObject, *candidate, validationError)) {
+    delete candidate;
+    server.send(400, "text/plain; charset=utf-8", "Invalid preset: " + validationError);
+    return;
+  }
+  if (!saveDeviceSettings(*candidate)) {
+    delete candidate;
+    server.send(507, "text/plain; charset=utf-8", "The preset could not be written to storage.");
+    return;
+  }
+  delete candidate;
+
+  loadDeviceSettings(devices[index]);
+  server.send(200, "text/plain; charset=utf-8",
+              "Preset imported for " + String(typeToName(devices[index].type)) + ".");
 }
 
 void handleExportSettings() {

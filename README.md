@@ -18,6 +18,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 - Press／Releaseを0件にして「何も送信しない」設定
 - ボタンを押すたびに値を進めるSequenceモード
 - 設定のJSONエクスポート／インポート
+- UIDを含まないデバイス単体プリセットのJSON共有
 - 画面回転
 - Arduino IDEとPlatformIOの両方に対応
 
@@ -91,6 +92,18 @@ Web UIの`Export Settings (JSON)`から保存済み設定をダウンロード�
 - JSONには将来の互換性判定用の`format`と`schemaVersion`が含まれます。
 
 形式の詳細は[SETTINGS_SCHEMA.md](SETTINGS_SCHEMA.md)を参照してください。
+
+## デバイス設定プリセット
+
+接続中の各Chainデバイス右上にある`…`メニューから、そのデバイス単体の設定をJSONとしてエクスポート・インポートできます。
+
+- プリセットにはUIDとDevice Nameを含みません。
+- 同じ種類のChainデバイスにだけインポートできます。
+- インポート先のUIDとDevice Nameは維持されます。
+- OSC Address、値、出力範囲、動作モードなどの種類別設定が置き換わります。
+- 編集中の内容をエクスポートする場合は、先に`Save All Settings`で保存してください。
+
+この機能は、設定サンプルをほかの利用者へ共有する用途を想定しています。本体全体の移行や復旧には、従来のSettings Backupを使用してください。
 
 ## 工場出荷状態へ戻す
 
