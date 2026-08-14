@@ -30,6 +30,7 @@ uint8_t operation_status = 0;
 uint8_t color_red[3]   = {255, 0, 0};
 uint8_t color_blue[3]  = {0, 0, 255};
 uint8_t color_green[3] = {0, 200, 0};
+uint8_t color_orange[3] = {255, 96, 0};
 
 unsigned long lastReenumMs          = 0;
 int           lastKnownDeviceCount  = -1;

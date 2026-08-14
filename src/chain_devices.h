@@ -10,3 +10,4 @@ void pollAngle(ChainDevice& d);
 void pollJoystick(ChainDevice& d);
 void pollTof(ChainDevice& d);
 void pollAllDevices();
+bool identifyChainDevice(int index, const String& uid);

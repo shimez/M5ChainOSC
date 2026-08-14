@@ -119,6 +119,7 @@ struct ChainDevice {
   uint32_t lastTofPollMs   = 0;
   uint32_t lastTofConfigMs = 0;
   uint8_t  tofReadFailures = 0;
+  uint32_t identifyUntilMs = 0;
 };
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 
 - Web UIによる設定
 - Chainデバイスの接続・取り外し・再接続の検出
+- 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示
 - UID単位の設定保存と再接続時の復元
 - OSC値の`Float`、`Int`、`String`送信
 - Key、Encoderクリック、Joystickクリックから複数OSCメッセージを送信

@@ -355,6 +355,7 @@ void registerWebRoutes() {
   server.on("/import_settings", HTTP_POST, handleImportSettings);
   server.on("/export_device_preset", HTTP_GET, handleExportDevicePreset);
   server.on("/import_device_preset", HTTP_POST, handleImportDevicePreset);
+  server.on("/identify_device", HTTP_POST, handleIdentifyDevice);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,6 +447,7 @@ function chooseSettingsFile(){document.getElementById('import-file').click()}
 function closeDeviceMenus(except){document.querySelectorAll('.device-menu.open').forEach(menu=>{if(menu!==except){menu.classList.remove('open');let button=menu.parentNode.querySelector('.more-button');if(button)button.setAttribute('aria-expanded','false')}})}
 function toggleDeviceMenu(event,index){event.stopPropagation();let menu=document.getElementById('device-menu-'+index),opening=!menu.classList.contains('open');closeDeviceMenus(menu);menu.classList.toggle('open',opening);event.currentTarget.setAttribute('aria-expanded',opening?'true':'false')}
 function chooseDevicePreset(index){document.getElementById('preset-file-'+index).click()}
+async function identifyDevice(index,uid){closeDeviceMenus();let status=document.getElementById('preset-status-'+index);status.textContent='';try{let body='index='+encodeURIComponent(index)+'&uid='+encodeURIComponent(uid),response=await fetch('/identify_device',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body}),message=await response.text();if(!response.ok)throw new Error(message);status.textContent=''}catch(e){status.textContent=e.message;alert(e.message)}}
 async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,'The preset file is too large.');input.value='';return}if(!confirm('Apply this preset to the selected device? Its device settings will be overwritten.')){input.value='';return}status.textContent='Importing preset...';try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 document.addEventListener('click',()=>closeDeviceMenus());
 window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-row').forEach(r=>{validateInput(r.querySelector('.msg-address'));validateInput(r.querySelector('.msg-value'))});document.querySelectorAll('[id^="count_"]').forEach(x=>renumber(x.id.substring(6)))})
@@ -498,6 +500,7 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
     if (!ph && devices[i].type != CHAIN_UNKNOWN_TYPE_CODE) {
       html += "<div class='device-menu-wrap'><button class='more-button' type='button' aria-label='Device menu' aria-expanded='false' onclick='toggleDeviceMenu(event," + idx + ")'>&hellip;</button>";
       html += "<div id='device-menu-" + idx + "' class='device-menu' onclick='event.stopPropagation()'>";
+      html += "<button type='button' onclick=\"identifyDevice(" + idx + ",'" + devices[i].uid + "')\">Identify Device (Orange LED for 10s)</button>";
       html += "<div class='menu-note'>Device preset (UID and Device Name are not included)</div>";
       html += "<a href='/export_device_preset?index=" + idx + "' onclick='closeDeviceMenus()'>Export Preset (JSON)</a>";
       html += "<button type='button' onclick='chooseDevicePreset(" + idx + ")'>Import Preset (JSON)</button>";
@@ -812,6 +815,19 @@ static int requestedActiveDeviceIndex() {
   if (index < 0 || index >= deviceCount || !devices[index].active ||
       !devices[index].uid.length() || isPlaceholderUid(devices[index].uid)) return -1;
   return index;
+}
+
+void handleIdentifyDevice() {
+  int index = requestedActiveDeviceIndex();
+  if (index < 0 || !server.hasArg("uid") || server.arg("uid") != devices[index].uid) {
+    server.send(404, "text/plain; charset=utf-8", "The selected connected device was not found.");
+    return;
+  }
+  if (!identifyChainDevice(index, server.arg("uid"))) {
+    server.send(502, "text/plain; charset=utf-8", "The device LED could not be changed.");
+    return;
+  }
+  server.send(200, "text/plain; charset=utf-8", "Orange LED active for 10 seconds.");
 }
 
 void handleExportDevicePreset() {

@@ -13,14 +13,17 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 デスクトップ版のChromeまたはEdgeを使用してください。
 
-現在の正式版は`1.1.0`です。Chain ToFの最大距離、範囲外でのOSC送信停止、出力方向の設定に対応しています。
+現在の正式版は`1.2.0`です。
+
+- Version 1.2.0: 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示に対応
+- Version 1.1.0: Chain ToFの最大距離、範囲外でのOSC送信停止、出力方向の設定に対応
 
 ## バイナリの配置
 
 Arduino IDEの`Sketch` → `Export Compiled Binary`で生成したmergedバイナリを、次の名前で配置します。
 
 ```text
-docs/installer/firmware/M5ChainOSC-1.1.0-AtomS3R-merged.bin
+docs/installer/firmware/M5ChainOSC-1.2.0-AtomS3R-merged.bin
 ```
 
 `manifest.json`は、このファイルをESP32-S3のoffset `0x0`へ書き込みます。

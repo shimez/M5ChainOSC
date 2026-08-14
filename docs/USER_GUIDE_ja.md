@@ -59,6 +59,8 @@ AtomS3Rと同じネットワークに接続した端末から、次のいずれ�
 - UID: デバイス固有の識別子。設定はUID単位で保存されます。
 - `Save All Settings`: 画面上のOSC送信先と接続中デバイス設定を保存します。
 
+M5ChainOSCが認識した対応Chainデバイスは、通常時にLEDが青く点灯します。各デバイス右上の`…`から`Identify Device (Orange LED for 10s)`を選ぶと、そのUIDのデバイスだけが10秒間オレンジに点灯し、その後青へ戻ります。この識別操作は設定として保存されません。
+
 設定後は必ず`Save All Settings`を押してください。保存したデバイスは、取り外しやAtomS3Rの再起動後も、同じUIDで再接続されると設定が復元されます。
 
 ### Saved Device Settings

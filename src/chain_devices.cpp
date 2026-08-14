@@ -7,6 +7,43 @@
 // ---------------------------------------------------------------------------
 // Poll helpers
 // ---------------------------------------------------------------------------
+static bool hasStatusLed(chain_device_type_t type) {
+  return type == CHAIN_KEY_TYPE_CODE ||
+         type == CHAIN_ENCODER_TYPE_CODE ||
+         type == CHAIN_ANGLE_TYPE_CODE ||
+         type == CHAIN_JOYSTICK_TYPE_CODE ||
+         type == CHAIN_TOF_TYPE_CODE;
+}
+
+static bool isIdentifyActive(const ChainDevice& d, uint32_t now) {
+  return d.identifyUntilMs != 0 && (int32_t)(d.identifyUntilMs - now) > 0;
+}
+
+static void setOperationalLed(ChainDevice& d, uint8_t color[3]) {
+  if (!hasStatusLed(d.type) || isIdentifyActive(d, millis())) return;
+  M5Chain.setRGBValue(d.chainId, 0, 1, color, 3, &operation_status);
+}
+
+bool identifyChainDevice(int index, const String& uid) {
+  if (index < 0 || index >= deviceCount || !devices[index].active ||
+      !hasStatusLed(devices[index].type) || devices[index].uid != uid) return false;
+  M5Chain.setRGBLight(devices[index].chainId, 80, &operation_status);
+  if (M5Chain.setRGBValue(devices[index].chainId, 0, 1, color_orange, 3,
+                          &operation_status) != CHAIN_OK) return false;
+  devices[index].identifyUntilMs = millis() + 10000UL;
+  return true;
+}
+
+static void updateIdentifyLeds() {
+  const uint32_t now = millis();
+  for (int i = 0; i < deviceCount; i++) {
+    ChainDevice& d = devices[i];
+    if (!d.active || d.identifyUntilMs == 0 || isIdentifyActive(d, now)) continue;
+    d.identifyUntilMs = 0;
+    M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
+  }
+}
+
 void pollEncoder(ChainDevice& d) {
   int16_t absv = 0;
   if (M5Chain.getEncoderValue(d.chainId, &absv) == CHAIN_OK) {
@@ -38,17 +75,17 @@ void pollEncoder(ChainDevice& d) {
   if (M5Chain.getEncoderButtonStatus(d.chainId, &st) == CHAIN_OK && st != d.lastButtonStatus) {
     if (d.enc.clickMode == MODE_SEQUENCE) {
       if (st == 1) {
-        M5Chain.setRGBValue(d.chainId, 0, 1, color_green, 3, &operation_status);
+        setOperationalLed(d, color_green);
         handleSequencePress(d.enc.clickSeq, deviceDisplayName(d));
       } else {
-        M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
+        setOperationalLed(d, color_blue);
       }
     } else if (st == 1) {
-      M5Chain.setRGBValue(d.chainId, 0, 1, color_red, 3, &operation_status);
+      setOperationalLed(d, color_red);
       for(uint8_t i=0;i<d.enc.pressMessageCount;i++) sendOSC(d.enc.pressMessages[i]);
       if(d.enc.pressMessageCount){const OSCMessage& m=d.enc.pressMessages[d.enc.pressMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     } else {
-      M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
+      setOperationalLed(d, color_blue);
       for(uint8_t i=0;i<d.enc.releaseMessageCount;i++) sendOSC(d.enc.releaseMessages[i]);
       if(d.enc.releaseMessageCount){const OSCMessage& m=d.enc.releaseMessages[d.enc.releaseMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     }
@@ -111,17 +148,17 @@ void pollJoystick(ChainDevice& d) {
   if (M5Chain.getJoystickButtonStatus(d.chainId, &st) == CHAIN_OK && st != d.lastButtonStatus) {
     if (d.joy.clickMode == MODE_SEQUENCE) {
       if (st == 1) {
-        M5Chain.setRGBValue(d.chainId, 0, 1, color_green, 3, &operation_status);
+        setOperationalLed(d, color_green);
         handleSequencePress(d.joy.clickSeq, deviceDisplayName(d));
       } else {
-        M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
+        setOperationalLed(d, color_blue);
       }
     } else if (st == 1) {
-      M5Chain.setRGBValue(d.chainId, 0, 1, color_red, 3, &operation_status);
+      setOperationalLed(d, color_red);
       for(uint8_t i=0;i<d.joy.pressMessageCount;i++) sendOSC(d.joy.pressMessages[i]);
       if(d.joy.pressMessageCount){const OSCMessage& m=d.joy.pressMessages[d.joy.pressMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     } else {
-      M5Chain.setRGBValue(d.chainId, 0, 1, color_blue, 3, &operation_status);
+      setOperationalLed(d, color_blue);
       for(uint8_t i=0;i<d.joy.releaseMessageCount;i++) sendOSC(d.joy.releaseMessages[i]);
       if(d.joy.releaseMessageCount){const OSCMessage& m=d.joy.releaseMessages[d.joy.releaseMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
     }
@@ -207,20 +244,20 @@ void pollAllDevices() {
       if (st == devices[i].lastButtonStatus) continue;
       if (devices[i].mode == MODE_SEQUENCE) {
         if (st == 1) {
-          M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_green, 3, &operation_status);
+          setOperationalLed(devices[i], color_green);
           handleSequencePress(devices[i].seq, deviceDisplayName(devices[i]));
         } else {
-          M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_blue, 3, &operation_status);
+          setOperationalLed(devices[i], color_blue);
         }
       } else if (st == 1) {
-        M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_red, 3, &operation_status);
+        setOperationalLed(devices[i], color_red);
         for (uint8_t m = 0; m < devices[i].pressMessageCount; m++) sendOSC(devices[i].pressMessages[m]);
         if (devices[i].pressMessageCount > 0) {
           const OSCMessage& last = devices[i].pressMessages[devices[i].pressMessageCount - 1];
           showOscFeedback(deviceDisplayName(devices[i]), last.address, last.valueStr);
         }
       } else {
-        M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_blue, 3, &operation_status);
+        setOperationalLed(devices[i], color_blue);
         for (uint8_t m = 0; m < devices[i].releaseMessageCount; m++) sendOSC(devices[i].releaseMessages[m]);
         if (devices[i].releaseMessageCount > 0) {
           const OSCMessage& last = devices[i].releaseMessages[devices[i].releaseMessageCount - 1];
@@ -238,6 +275,7 @@ void pollAllDevices() {
       pollTof(devices[i]);
     }
   }
+  updateIdentifyLeds();
 }
 
 // ---------------------------------------------------------------------------
@@ -323,9 +361,7 @@ bool refreshChainDevices(bool force) {
 
     for (int i = 0; i < deviceCount; i++) {
       if (!devices[i].active) continue;
-      if (devices[i].type == CHAIN_KEY_TYPE_CODE ||
-          devices[i].type == CHAIN_ENCODER_TYPE_CODE ||
-          devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
+      if (hasStatusLed(devices[i].type)) {
         M5Chain.setRGBLight(devices[i].chainId, 80, &operation_status);
         M5Chain.setRGBValue(devices[i].chainId, 0, 1, color_blue, 3, &operation_status);
       }

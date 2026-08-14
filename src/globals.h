@@ -48,6 +48,7 @@ extern uint8_t operation_status;
 extern uint8_t color_red[3];
 extern uint8_t color_blue[3];
 extern uint8_t color_green[3];
+extern uint8_t color_orange[3];
 
 extern unsigned long lastReenumMs;
 extern int           lastKnownDeviceCount;

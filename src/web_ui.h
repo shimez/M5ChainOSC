@@ -13,3 +13,4 @@ void handleExportSettings();
 void handleImportSettings();
 void handleExportDevicePreset();
 void handleImportDevicePreset();
+void handleIdentifyDevice();
