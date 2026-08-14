@@ -82,6 +82,15 @@ pio device monitor -b 115200
 
 `M5ChainOSC.ino`はArduino IDE用のエントリーポイントです。共通実装は`src/`以下にあります。
 
+## Preview Web Installer
+
+開発中のファームウェアは、[M5ChainOSC Preview Web Installer](https://shimez.github.io/M5ChainOSC/installer/preview/)からブラウザ経由でAtomS3Rへ書き込めます。
+
+> [!WARNING]
+> Preview版には実機検証前の機能が含まれる場合があります。インストール前に設定JSONをバックアップし、Installer画面に記載された注意事項を確認してください。
+
+Web Installerの構成とローカル確認方法は、[Preview Installer README](docs/installer/preview/README.md)を参照してください。
+
 ## 設定のバックアップ
 
 Web UIの`Export Settings (JSON)`から保存済み設定をダウンロードできます。`Import Settings (JSON)`では、同じUIDの設定を上書きして復元します。
@@ -130,6 +139,7 @@ src/
   osc_send.*            OSC送信
 docs/
   USER_GUIDE_ja.md      日本語ユーザーガイド
+  installer/preview/    Preview Web Installer
 presets/
   README.md              デバイスプリセット一覧と使用方法
   joystick/              Joystick用プリセット
