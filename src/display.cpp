@@ -21,6 +21,17 @@ void showMessage(const char* a, const char* b) {
   }
 }
 
+void showWifiConnected(const String& ipAddress) {
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setTextDatum(middle_center);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  int cx = M5.Display.width() / 2;
+  int cy = M5.Display.height() / 2;
+  M5.Display.drawString("WiFi OK", cx, cy - 9);
+  M5.Display.drawString(ipAddress, cx, cy + 9);
+}
+
 void drawMainScreen() {
   M5.Display.fillScreen(TFT_BLACK);
   M5.Display.setTextDatum(TL_DATUM);

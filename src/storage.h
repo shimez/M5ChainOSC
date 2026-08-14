@@ -12,6 +12,7 @@ String deviceNameKeyLegacy(const String& uid);
 // Defaults / serialize
 void setDefaultDeviceMessages(ChainDevice& d);
 String serializeDeviceConfig(const ChainDevice& d);
+size_t deviceConfigStorageBytes(const ChainDevice& d);
 void applySerializedConfig(ChainDevice& d, const String& blob);
 
 // Per-device load / save / delete
@@ -19,7 +20,7 @@ String loadDeviceNameOnly(const String& uid);
 void saveDeviceNameOnly(const String& uid, const String& name);
 void applyKnownDisplayName(ChainDevice& d);
 void loadDeviceSettings(ChainDevice& d);
-void saveDeviceSettings(const ChainDevice& d);
+bool saveDeviceSettings(const ChainDevice& d);
 void deleteDeviceSettingsByUid(const String& uid);
 
 // Known list

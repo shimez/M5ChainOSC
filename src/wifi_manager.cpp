@@ -39,7 +39,7 @@ void connectOrStartAP() {
 
     registerWebRoutes();
     server.begin();
-    showMessage("WiFi OK", ipStr.c_str());
+    showWifiConnected(ipStr);
     delay(800);
   } else {
     startAPMode();

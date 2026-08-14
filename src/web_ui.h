@@ -9,3 +9,7 @@ void handleSave();
 void handleDeleteWifi();
 void handleDeleteDevice();
 void handleSetRotation();
+void handleExportSettings();
+void handleImportSettings();
+void handleExportDevicePreset();
+void handleImportDevicePreset();

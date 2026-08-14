@@ -14,6 +14,16 @@
 // ---------------------------------------------------------------------------
 static const int MAX_DEVICES = 8;
 static const int MAX_KNOWN   = 16;
+static const int MAX_KEY_OSC_MESSAGES = 8;
+static const size_t MAX_OSC_ADDRESS_BYTES = 192;
+static const size_t MAX_OSC_VALUE_BYTES = 128;
+static const size_t MAX_DEVICE_NAME_BYTES = 64;
+static const size_t MAX_DEVICE_CONFIG_BYTES = 3800;
+static const uint16_t SETTINGS_SCHEMA_VERSION = 2;
+static const char* SETTINGS_FORMAT_NAME = "M5ChainOSC-settings";
+
+// Enable only while diagnosing NVS persistence.
+#define M5CHAINOSC_STORAGE_DEBUG 0
 
 // ---------------------------------------------------------------------------
 // Timing
