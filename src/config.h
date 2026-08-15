@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "M5Chain.h"
 
-static const char* APP_VERSION = "1.3.0";
+static const char* APP_VERSION = "1.4.0";
 
 // ---------------------------------------------------------------------------
 // Hardware / bus
@@ -28,7 +28,7 @@ static const char* SETTINGS_FORMAT_NAME = "M5ChainOSC-settings";
 #define M5CHAINOSC_STORAGE_DEBUG 0
 
 // Enable only while diagnosing repeated Web UI reload performance.
-#define M5CHAINOSC_WEB_PERF_DEBUG 1
+#define M5CHAINOSC_WEB_PERF_DEBUG 0
 
 // ---------------------------------------------------------------------------
 // Timing
