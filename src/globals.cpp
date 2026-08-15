@@ -1,9 +1,9 @@
 #include "globals.h"
 
-Chain       M5Chain;
-WebServer   server(80);
-DNSServer   dnsServer;
-Preferences prefs;
+Chain               M5Chain;
+ResponsiveWebServer server(80);
+DNSServer           dnsServer;
+Preferences         prefs;
 
 bool isAPMode      = false;
 bool chainBusReady = false;
@@ -20,6 +20,8 @@ int     osc_port      = 9000;
 String  ipStr         = "";
 String  hostStr       = "atoms3r-osc.local";
 uint8_t displayRotation = 0;
+UiLanguage uiLanguage = UI_LANG_ENGLISH;
+bool       uiLanguageConfigured = false;
 
 String lastOscName = "";
 String lastOscAddr = "";

@@ -18,7 +18,8 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 
 ## 主な機能
 
-- Web UIによる設定
+- 英語／日本語を切り替えられるWeb UIによる設定
+- AtomS3R画面へのファームウェアバージョン表示
 - Chainデバイスの接続・取り外し・再接続の検出
 - 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示
 - UID単位の設定保存と再接続時の復元
@@ -107,7 +108,7 @@ Web Installerの構成とローカル確認方法は、[Installer README](docs/i
 Web UIの`Export Settings (JSON)`から保存済み設定をダウンロードできます。`Import Settings (JSON)`では、同じUIDの設定を上書きして復元します。
 
 - JSONに含まれない既存デバイス設定は維持されます。
-- OSC送信先と画面回転も復元されます。
+- OSC送信先、画面回転、Web UIの言語設定も復元されます。
 - Wi-FiのSSIDとパスワードはJSONに含まれず、インポートでも変更されません。
 - JSONには将来の互換性判定用の`format`と`schemaVersion`が含まれます。
 

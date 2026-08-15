@@ -1,6 +1,14 @@
 #include "display.h"
 #include "globals.h"
 
+static void drawVersionHeader() {
+  M5.Display.setTextDatum(top_center);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  M5.Display.drawString(String("M5ChainOSC v") + APP_VERSION,
+                        M5.Display.width() / 2, 2);
+}
+
 void applyDisplayRotation() {
   if (displayRotation > 3) displayRotation = 0;
   M5.Display.setRotation(displayRotation);
@@ -8,6 +16,7 @@ void applyDisplayRotation() {
 
 void showMessage(const char* a, const char* b) {
   M5.Display.fillScreen(TFT_BLACK);
+  drawVersionHeader();
   M5.Display.setTextDatum(middle_center);
   M5.Display.setTextSize(2);
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -23,6 +32,7 @@ void showMessage(const char* a, const char* b) {
 
 void showWifiConnected(const String& ipAddress) {
   M5.Display.fillScreen(TFT_BLACK);
+  drawVersionHeader();
   M5.Display.setTextDatum(middle_center);
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -43,7 +53,7 @@ void drawMainScreen() {
 
   M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
   M5.Display.setCursor(2, 2);
-  M5.Display.println("OSC Ready");
+  M5.Display.println(String("M5ChainOSC v") + APP_VERSION);
 
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5.Display.setCursor(2, 16);
@@ -128,6 +138,7 @@ void showResetProgress(unsigned long heldMs) {
   int cx = M5.Display.width() / 2;
   int cy = M5.Display.height() / 2 - 6;
   M5.Display.fillScreen(TFT_BLACK);
+  drawVersionHeader();
   M5.Display.drawCircle(cx, cy, 36, TFT_DARKGREY);
   M5.Display.drawCircle(cx, cy, 28, TFT_DARKGREY);
   float deg = (heldMs * 360.0f) / (float)RESET_HOLD_MS;

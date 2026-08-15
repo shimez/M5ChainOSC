@@ -10,6 +10,66 @@
 #include <new>
 #include <stdlib.h>
 #include <ArduinoJson.h>
+#include <esp_heap_caps.h>
+
+#if M5CHAINOSC_WEB_PERF_DEBUG
+static uint32_t webPerfRequestSequence = 0;
+
+static void logWebPerf(uint32_t requestId, uint32_t requestStart,
+                       const char* phase, size_t bytes = 0,
+                       uint32_t operationMs = 0) {
+  const uint32_t internalCaps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+  size_t freeHeap = heap_caps_get_free_size(internalCaps);
+  size_t minFreeHeap = ESP.getMinFreeHeap();
+  size_t largestBlock = heap_caps_get_largest_free_block(internalCaps);
+  size_t freePsram = ESP.getFreePsram();
+  unsigned fragmentation = freeHeap > 0
+      ? 100U - (unsigned)((largestBlock * 100U) / freeHeap)
+      : 100U;
+  IPAddress remote = server.client().remoteIP();
+  Serial.printf(
+      "[M5OSC][WEBPERF] req=%lu phase=%s elapsed=%lu op=%lu bytes=%u "
+      "free=%u min=%u largest=%u psram=%u frag=%u%% connected=%d rssi=%d remote=%s\n",
+      (unsigned long)requestId, phase,
+      (unsigned long)(millis() - requestStart), (unsigned long)operationMs,
+      (unsigned)bytes, (unsigned)freeHeap, (unsigned)minFreeHeap,
+      (unsigned)largestBlock, (unsigned)freePsram, fragmentation,
+      server.client().connected() ? 1 : 0,
+      WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0,
+      remote.toString().c_str());
+}
+#define WEB_PERF_LOG(id, start, phase, bytes, opMs) \
+  logWebPerf((id), (start), (phase), (bytes), (opMs))
+#else
+#define WEB_PERF_LOG(id, start, phase, bytes, opMs) do {} while (0)
+#endif
+
+static bool isJapaneseUi() {
+  return uiLanguage == UI_LANG_JAPANESE;
+}
+
+static const char* tr(const char* english, const char* japanese) {
+  return isJapaneseUi() ? japanese : english;
+}
+
+static void sendUiResult(int status, const String& title, const String& message,
+                         bool showBack = true) {
+  String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") +
+                "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><h2>" +
+                htmlEscape(title) + "</h2><p>" + htmlEscape(message) + "</p>";
+  if (showBack) html += "<p><a href='/'>" + String(tr("Back", "戻る")) + "</a></p>";
+  html += "</body></html>";
+  server.send(status, "text/html; charset=utf-8", html);
+}
+
+static void applyBrowserLanguageOnFirstVisit() {
+  if (uiLanguageConfigured) return;
+  String accepted = server.header("Accept-Language");
+  accepted.toLowerCase();
+  if (!accepted.length()) return;
+  uiLanguage = accepted.startsWith("ja") ? UI_LANG_JAPANESE : UI_LANG_ENGLISH;
+  saveUiLanguage();
+}
 
 // ---------------------------------------------------------------------------
 // Small HTML helpers
@@ -31,7 +91,7 @@ static String numericTypeSelectHtml(const String& name, ValueType cur) {
 }
 
 static String clickModeHtml(const String& name, KeyMode cur, const String& prId, const String& sqId) {
-  String s = "<div class='mode-box'><label>Click Mode</label>";
+  String s = "<div class='mode-box'><label>" + String(tr("Click Mode", "クリックモード")) + "</label>";
   s += "<select name='" + name + "' onchange=\"toggleClickMode('" + prId + "','" + sqId + "',this)\">";
   s += "<option value='0'" + String(cur == MODE_PRESS_RELEASE ? " selected" : "") + ">Press / Release</option>";
   s += "<option value='1'" + String(cur == MODE_SEQUENCE ? " selected" : "") + ">Sequence (press only)</option>";
@@ -45,9 +105,9 @@ static String messageRowHtml(const String& group, const String& prefix, const ch
   String row = "<div class='osc-row' data-group='" + group + "' data-prefix='" + prefix + "' data-event='" + eventName + "'>";
   row += "<div class='order'><button type='button' class='mv' onclick='moveMsg(this,-1)'>&uarr;</button><button type='button' class='mv' onclick='moveMsg(this,1)'>&darr;</button></div>";
   row += "<div class='field'><label>OSC Address</label><input class='msg-address' maxlength='192' name='" + p + "a_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.address) + "' oninput='limitAndValidate(this,192)'><small><span class='err'></span><span class='bytes'></span></small></div>";
-  row += "<div class='field'><label>Type</label>" + typeSelectHtml(p + "t_" + idx + "_" + String(order), m.valueType) + "<small></small></div>";
-  row += "<div class='field'><label>Value</label><input class='msg-value' maxlength='128' name='" + p + "v_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.valueStr) + "' oninput='limitAndValidate(this,128)'><small><span class='err'></span><span class='bytes'></span></small></div>";
-  row += "<button type='button' class='remove-msg' onclick='removeMsg(this)'>Delete</button></div>";
+  row += "<div class='field'><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml(p + "t_" + idx + "_" + String(order), m.valueType) + "<small></small></div>";
+  row += "<div class='field'><label>" + String(tr("Value", "値")) + "</label><input class='msg-value' maxlength='128' name='" + p + "v_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.valueStr) + "' oninput='limitAndValidate(this,128)'><small><span class='err'></span><span class='bytes'></span></small></div>";
+  row += "<button type='button' class='remove-msg' onclick='removeMsg(this)'>" + String(tr("Delete", "削除")) + "</button></div>";
   return row;
 }
 
@@ -55,25 +115,25 @@ static String clickMessagesHtml(const String& idx, const String& prefix, bool se
                                 const OSCMessage* press, uint8_t pressCount,
                                 const OSCMessage* release, uint8_t releaseCount) {
   String group=prefix+idx, out="<div id='"+prefix+"pr_"+idx+"' style='display:"+String(sequenceMode?"none":"block")+"'>";
-  out += "<div class='usage'><strong>Messages <span id='count_"+group+"'>"+String(pressCount+releaseCount)+"</span> / 8</strong><span>Press + Release</span></div>";
+  out += "<div class='usage'><strong>" + String(tr("Messages", "メッセージ")) + " <span id='count_"+group+"'>"+String(pressCount+releaseCount)+"</span> / 8</strong><span>Press + Release</span></div>";
   out += "<input type='hidden' id='pc_"+group+"' name='"+prefix+"pc_"+idx+"' value='"+String(pressCount)+"'><input type='hidden' id='rc_"+group+"' name='"+prefix+"rc_"+idx+"' value='"+String(releaseCount)+"'>";
   out += "<div class='event-tabs'><button type='button' class='event-tab active' onclick=\"showEvent('"+group+"','press',this)\">Press</button><button type='button' class='event-tab' onclick=\"showEvent('"+group+"','release',this)\">Release</button></div>";
   out += "<div class='event-panel' data-group='"+group+"' data-event='press'><div class='osc-list' id='list_press_"+group+"'>";
   for(uint8_t i=0;i<pressCount;i++) out+=messageRowHtml(group,prefix,"press",i,press[i]);
-  out += "</div><div class='empty'>No OSC message is sent when pressed.</div><button type='button' class='add-msg' data-group='"+group+"' data-prefix='"+prefix+"' data-event='press' onclick='addMsg(this)'>+ Add OSC Message</button></div>";
+  out += "</div><div class='empty'>" + String(tr("No OSC message is sent when pressed.", "押したときはOSCメッセージを送信しません。")) + "</div><button type='button' class='add-msg' data-group='"+group+"' data-prefix='"+prefix+"' data-event='press' onclick='addMsg(this)'>" + String(tr("+ Add OSC Message", "+ OSCメッセージを追加")) + "</button></div>";
   out += "<div class='event-panel' data-group='"+group+"' data-event='release' style='display:none'><div class='osc-list' id='list_release_"+group+"'>";
   for(uint8_t i=0;i<releaseCount;i++) out+=messageRowHtml(group,prefix,"release",i,release[i]);
-  out += "</div><div class='empty'>No OSC message is sent when released.</div><button type='button' class='add-msg' data-group='"+group+"' data-prefix='"+prefix+"' data-event='release' onclick='addMsg(this)'>+ Add OSC Message</button></div></div>";
+  out += "</div><div class='empty'>" + String(tr("No OSC message is sent when released.", "離したときはOSCメッセージを送信しません。")) + "</div><button type='button' class='add-msg' data-group='"+group+"' data-prefix='"+prefix+"' data-event='release' onclick='addMsg(this)'>" + String(tr("+ Add OSC Message", "+ OSCメッセージを追加")) + "</button></div></div>";
   return out;
 }
 
 static bool validOscAddressText(const String& address, String& error) {
-  if (!address.length() || !address.startsWith("/")) { error = "OSC Address must start with /."; return false; }
-  if (address.length() > MAX_OSC_ADDRESS_BYTES) { error = "OSC Address is too long."; return false; }
+  if (!address.length() || !address.startsWith("/")) { error = tr("OSC Address must start with /.", "OSC Addressは / から始めてください。"); return false; }
+  if (address.length() > MAX_OSC_ADDRESS_BYTES) { error = tr("OSC Address is too long.", "OSC Addressが長すぎます。"); return false; }
   for (size_t i = 0; i < address.length(); i++) {
     char c = address[i];
     if (isspace((unsigned char)c) || c == '#' || c == '*' || c == ',' || c == '?' || c == '[' || c == ']' || c == '{' || c == '}') {
-      error = "OSC Address contains an invalid character."; return false;
+      error = tr("OSC Address contains an invalid character.", "OSC Addressに使用できない文字が含まれています。"); return false;
     }
   }
   return true;
@@ -83,20 +143,20 @@ static bool validOscMessage(const OSCMessage& m, String& error) {
   String address = m.address;
   address.trim();
   if (!validOscAddressText(address, error)) return false;
-  if (m.valueStr.length() > MAX_OSC_VALUE_BYTES) { error = "OSC Value is too long."; return false; }
+  if (m.valueStr.length() > MAX_OSC_VALUE_BYTES) { error = tr("OSC Value is too long.", "OSC Valueが長すぎます。"); return false; }
   if (m.valueType == TYPE_FLOAT) {
     char* end = nullptr; float value = strtof(m.valueStr.c_str(), &end);
-    if (!end || end == m.valueStr.c_str() || *end != '\0' || !isfinite(value)) { error = "Float value is invalid."; return false; }
+    if (!end || end == m.valueStr.c_str() || *end != '\0' || !isfinite(value)) { error = tr("Float value is invalid.", "Float値が正しくありません。"); return false; }
   } else if (m.valueType == TYPE_INT) {
     errno = 0; char* end = nullptr; long value = strtol(m.valueStr.c_str(), &end, 10);
-    if (!end || end == m.valueStr.c_str() || *end != '\0' || errno == ERANGE || value < INT32_MIN || value > INT32_MAX) { error = "Integer value is invalid."; return false; }
+    if (!end || end == m.valueStr.c_str() || *end != '\0' || errno == ERANGE || value < INT32_MIN || value > INT32_MAX) { error = tr("Integer value is invalid.", "Int値が正しくありません。"); return false; }
   }
   return true;
 }
 
 static bool parseMessageList(const String& idx,const String& prefix,OSCMessage* press,uint8_t& pc,OSCMessage* release,uint8_t& rc,String& error){
   int p=constrain(server.arg(prefix+"pc_"+idx).toInt(),0,MAX_KEY_OSC_MESSAGES),r=constrain(server.arg(prefix+"rc_"+idx).toInt(),0,MAX_KEY_OSC_MESSAGES);
-  if(p+r>MAX_KEY_OSC_MESSAGES){error="Press and Release messages must total 8 or fewer.";return false;}
+  if(p+r>MAX_KEY_OSC_MESSAGES){error=tr("Press and Release messages must total 8 or fewer.","PressとReleaseのメッセージは合計8件以内にしてください。");return false;}
   pc=p;rc=r;
   for(int i=0;i<p;i++){press[i].address=server.arg(prefix+"pa_"+idx+"_"+String(i));press[i].valueStr=server.arg(prefix+"pv_"+idx+"_"+String(i));int t=server.arg(prefix+"pt_"+idx+"_"+String(i)).toInt();press[i].valueType=(ValueType)constrain(t,(int)TYPE_FLOAT,(int)TYPE_STRING);if(!validOscMessage(press[i],error))return false;}
   for(int i=0;i<r;i++){release[i].address=server.arg(prefix+"ra_"+idx+"_"+String(i));release[i].valueStr=server.arg(prefix+"rv_"+idx+"_"+String(i));int t=server.arg(prefix+"rt_"+idx+"_"+String(i)).toInt();release[i].valueType=(ValueType)constrain(t,(int)TYPE_FLOAT,(int)TYPE_STRING);if(!validOscMessage(release[i],error))return false;}
@@ -346,7 +406,10 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device, String& 
 // Route registration
 // ---------------------------------------------------------------------------
 void registerWebRoutes() {
+  const char* trackedHeaders[] = {"Accept-Language"};
+  server.collectHeaders(trackedHeaders, 1);
   server.on("/", handleRoot);
+  server.on("/set_language", HTTP_POST, handleSetLanguage);
   server.on("/save", handleSave);
   server.on("/delete_wifi", handleDeleteWifi);
   server.on("/delete_device", handleDeleteDevice);
@@ -362,10 +425,13 @@ void registerWebRoutes() {
 // AP captive portal
 // ---------------------------------------------------------------------------
 void handleAPRoot() {
-  server.send(200, "text/html",
-    "<html><body><h2>WiFi Setup</h2><form method='POST' action='/save_wifi'>"
-    "SSID<input name='ssid'><br>Password<input type='password' name='password'><br>"
-    "<button type='submit'>Save & Restart</button></form></body></html>");
+  applyBrowserLanguageOnFirstVisit();
+  String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>WiFi Setup</title></head><body>";
+  html += "<form method='POST' action='/set_language'><label>" + String(tr("Language", "言語")) + "</label><select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form>";
+  html += "<h2>" + String(tr("WiFi Setup", "Wi-Fi設定")) + "</h2><form method='POST' action='/save_wifi'>";
+  html += "SSID<input name='ssid'><br>" + String(tr("Password", "パスワード")) + "<input type='password' name='password'><br>";
+  html += "<button type='submit'>" + String(tr("Save & Restart", "保存して再起動")) + "</button></form></body></html>";
+  server.send(200, "text/html; charset=utf-8", html);
 }
 
 void handleSaveWiFi() {
@@ -374,19 +440,41 @@ void handleSaveWiFi() {
     prefs.putString("ssid", server.arg("ssid"));
     prefs.putString("password", server.arg("password"));
     prefs.end();
-    server.send(200, "text/html", "<h2>Saved</h2>");
+    server.send(200, "text/html; charset=utf-8", String("<meta charset='utf-8'><h2>") + tr("Saved", "保存しました") + "</h2>");
     delay(1500);
     ESP.restart();
   }
-  server.send(400, "text/plain", "Error");
+  server.send(400, "text/plain; charset=utf-8", tr("Error", "エラー"));
+}
+
+void handleSetLanguage() {
+  if (server.hasArg("language")) {
+    uiLanguage = server.arg("language") == "ja" ? UI_LANG_JAPANESE : UI_LANG_ENGLISH;
+    saveUiLanguage();
+  }
+  server.sendHeader("Location", "/", true);
+  server.send(303, "text/plain", "");
 }
 
 // ---------------------------------------------------------------------------
 // Main settings page
 // ---------------------------------------------------------------------------
 void handleRoot() {
-  String html = R"raw(
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  applyBrowserLanguageOnFirstVisit();
+#if M5CHAINOSC_WEB_PERF_DEBUG
+  const uint32_t requestId = ++webPerfRequestSequence;
+#else
+  const uint32_t requestId = 0;
+#endif
+  const uint32_t requestStart = millis();
+  WEB_PERF_LOG(requestId, requestStart, "BEGIN", 0, 0);
+  // WebServer runs handlers serially, so retaining this buffer is safe and
+  // avoids allocating and freeing one large block on every page reload.
+  static String html;
+  html.remove(0);
+  html.reserve(20000);
+  html += R"raw(
+<!DOCTYPE html><html lang="__LANG__"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OSC Settings</title>
 <style>
 body{font-family:sans-serif;margin:16px;background:#f5f5f5}
@@ -425,9 +513,10 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .click-section{margin-top:14px;padding-left:12px;border-left:5px solid #20c997}.click-section>.mode-box{margin-top:0}
 .chk{display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:4px}
 .chk input{width:auto}
+.language-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.language-row h2{margin:0}.language-row form{margin:0;min-width:150px}.language-row select{margin:0}
 </style>
 <script>
-const MAX_MSG=8;const enc=new TextEncoder();
+const JA=__JA__;const tx=(en,ja)=>JA?ja:en;const MAX_MSG=8;const enc=new TextEncoder();
 function bytes(v){return enc.encode(v).length}
 function toggleMode(pr,sq,sel){if(!pr||!sq)return;if(sel.value==='1'){pr.style.display='none';sq.style.display='block';}else{pr.style.display='block';sq.style.display='none';}}
 function toggleClickMode(prId,sqId,sel){toggleMode(document.getElementById(prId),document.getElementById(sqId),sel);}
@@ -436,37 +525,44 @@ function allRows(group){return document.querySelectorAll('.osc-row[data-group="'
 function renumber(group){let rows=allRows(group),prefix=rows.length?rows[0].dataset.prefix:document.querySelector('.add-msg[data-group="'+group+'"]').dataset.prefix,idx=group.substring(prefix.length);['press','release'].forEach(ev=>{document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="'+ev+'"]').forEach((r,i)=>{let p=prefix+(ev==='press'?'p':'r');r.querySelector('.msg-address').name=p+'a_'+idx+'_'+i;r.querySelector('.type').name=p+'t_'+idx+'_'+i;r.querySelector('.msg-value').name=p+'v_'+idx+'_'+i})});let n=rows.length;document.getElementById('count_'+group).textContent=n;document.getElementById('pc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="press"]').length;document.getElementById('rc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="release"]').length;document.querySelectorAll('.add-msg[data-group="'+group+'"]').forEach(b=>b.disabled=n>=MAX_MSG)}
 function moveMsg(btn,d){let r=btn.closest('.osc-row'),s=d<0?r.previousElementSibling:r.nextElementSibling;if(!s)return;d<0?r.parentNode.insertBefore(r,s):r.parentNode.insertBefore(s,r);renumber(r.dataset.group)}
 function removeMsg(btn){let r=btn.closest('.osc-row'),g=r.dataset.group;r.remove();renumber(g)}
-function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>OSC Address</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>Type</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>Value</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">Delete</button>';list.appendChild(r);renumber(g);r.querySelector('.msg-address').focus()}
+function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>OSC Address</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>'+tx('Type','型')+'</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>'+tx('Value','値')+'</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">'+tx('Delete','削除')+'</button>';list.appendChild(r);renumber(g);r.querySelector('.msg-address').focus()}
 function limitBytes(i,max){while(bytes(i.value)>max)i.value=i.value.slice(0,-1)}
 function limitAndValidate(i,max){limitBytes(i,max);validateInput(i)}
-function validateInput(i){let max=i.classList.contains('msg-address')?192:128,b=bytes(i.value),err='';if(i.classList.contains('msg-address')){if(!i.value)err='Required';else if(i.value[0]!='/')err='Start with /';else if(/[\s#*,?\[\]{}]/.test(i.value))err='Invalid character'}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err='Invalid float';if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err='Invalid integer'}if(b>max)err='Too long';i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
-function validateForm(){let ok=true;document.querySelectorAll('.osc-row .msg-address,.osc-row .msg-value').forEach(i=>{if(!validateInput(i))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert('Please correct the highlighted OSC message fields.')}return ok}
-function showImportError(status,reason){let message='Import failed. The selected JSON file is not valid for this import.'+(reason?'\n\n'+reason:'');status.textContent=message.replace(/\n+/g,' ');alert(message)}
-async function importSettings(){let input=document.getElementById('import-file'),status=document.getElementById('import-status');if(!input.files.length)return;let file=input.files[0];if(file.size>49152){showImportError(status,'The JSON file is too large.');input.value='';return}if(!confirm('Import the settings in this file? Matching device settings will be overwritten.')){input.value='';return}status.textContent='Importing...';try{let body=await file.text(),response=await fetch('/import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),1000)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
+function validateInput(i){let max=i.classList.contains('msg-address')?192:128,b=bytes(i.value),err='';if(i.classList.contains('msg-address')){if(!i.value)err=tx('Required','必須です');else if(i.value[0]!='/')err=tx('Start with /','/ から始めてください');else if(/[\s#*,?\[\]{}]/.test(i.value))err=tx('Invalid character','使用できない文字があります')}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err=tx('Invalid float','小数として正しくありません');if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err=tx('Invalid integer','整数として正しくありません')}if(b>max)err=tx('Too long','長すぎます');i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
+function validateForm(){let ok=true;document.querySelectorAll('.osc-row .msg-address,.osc-row .msg-value').forEach(i=>{if(!validateInput(i))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC message fields.','赤く表示されたOSCメッセージ項目を修正してください。'))}return ok}
+function showImportError(status,reason){let message=tx('Import failed. The selected JSON file is not valid for this import.','インポートに失敗しました。選択したJSONファイルはこのインポートには使用できません。')+(reason?'\n\n'+reason:'');status.textContent=message.replace(/\n+/g,' ');alert(message)}
+async function importSettings(){let input=document.getElementById('import-file'),status=document.getElementById('import-status');if(!input.files.length)return;let file=input.files[0];if(file.size>49152){showImportError(status,tx('The JSON file is too large.','JSONファイルが大きすぎます。'));input.value='';return}if(!confirm(tx('Import the settings in this file? Matching device settings will be overwritten.','このファイルの設定をインポートしますか？同じデバイスの設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing...','インポート中...');try{let body=await file.text(),response=await fetch('/import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),1000)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 function chooseSettingsFile(){document.getElementById('import-file').click()}
 function closeDeviceMenus(except){document.querySelectorAll('.device-menu.open').forEach(menu=>{if(menu!==except){menu.classList.remove('open');let button=menu.parentNode.querySelector('.more-button');if(button)button.setAttribute('aria-expanded','false')}})}
 function toggleDeviceMenu(event,index){event.stopPropagation();let menu=document.getElementById('device-menu-'+index),opening=!menu.classList.contains('open');closeDeviceMenus(menu);menu.classList.toggle('open',opening);event.currentTarget.setAttribute('aria-expanded',opening?'true':'false')}
 function chooseDevicePreset(index){document.getElementById('preset-file-'+index).click()}
 async function identifyDevice(index,uid){closeDeviceMenus();let status=document.getElementById('preset-status-'+index);status.textContent='';try{let body='index='+encodeURIComponent(index)+'&uid='+encodeURIComponent(uid),response=await fetch('/identify_device',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body}),message=await response.text();if(!response.ok)throw new Error(message);status.textContent=''}catch(e){status.textContent=e.message;alert(e.message)}}
-async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,'The preset file is too large.');input.value='';return}if(!confirm('Apply this preset to the selected device? Its device settings will be overwritten.')){input.value='';return}status.textContent='Importing preset...';try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
+async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,tx('The preset file is too large.','プリセットファイルが大きすぎます。'));input.value='';return}if(!confirm(tx('Apply this preset to the selected device? Its device settings will be overwritten.','選択したデバイスへこのプリセットを適用しますか？デバイス設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing preset...','プリセットをインポート中...');try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 document.addEventListener('click',()=>closeDeviceMenus());
-window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-row').forEach(r=>{validateInput(r.querySelector('.msg-address'));validateInput(r.querySelector('.msg-value'))});document.querySelectorAll('[id^="count_"]').forEach(x=>renumber(x.id.substring(6)))})
-</script></head><body><h1>Chain OSC (VRChat)</h1>
+function initializeMessageRows(){let rows=Array.from(document.querySelectorAll('.osc-row')),i=0;function batch(){let end=Math.min(i+8,rows.length);for(;i<end;i++){let r=rows[i];validateInput(r.querySelector('.msg-address'));validateInput(r.querySelector('.msg-value'))}if(i<rows.length){requestAnimationFrame(batch);return}document.querySelectorAll('[id^="count_"]').forEach(x=>renumber(x.id.substring(6)))}batch()}
+window.addEventListener('DOMContentLoaded',initializeMessageRows)
+</script></head><body><h1>Chain OSC Setting</h1>
 )raw";
 
-  html += "<div class='card'><h2>WiFi</h2><p class='meta'>IP: " + ipStr + "</p>";
-  html += "<form action='/delete_wifi' method='POST' onsubmit=\"return confirm('Delete WiFi?');\">";
-  html += "<button class='btn-danger' type='submit'>Delete WiFi Settings</button></form></div>";
+  html.replace("__LANG__", isJapaneseUi() ? "ja" : "en");
+  html.replace("__JA__", isJapaneseUi() ? "true" : "false");
 
-  html += "<div class='card tool-card'><h2>Settings Backup &amp; Restore</h2>";
-  html += "<p class='note'>Back up or restore all M5ChainOSC settings as versioned JSON. WiFi credentials are not included.</p>";
+  html += "<div class='card language-row'><h2>" + String(tr("Language", "言語")) + "</h2><form action='/set_language' method='POST'>";
+  html += "<select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form></div>";
+
+  html += "<div class='card'><h2>WiFi</h2><p class='meta'>IP: " + ipStr + "</p>";
+  html += "<form action='/delete_wifi' method='POST' onsubmit=\"return confirm('" + String(tr("Delete WiFi settings?", "Wi-Fi設定を削除しますか？")) + "');\">";
+  html += "<button class='btn-danger' type='submit'>" + String(tr("Delete WiFi Settings", "Wi-Fi設定を削除")) + "</button></form></div>";
+
+  html += "<div class='card tool-card'><h2>" + String(tr("Settings Backup &amp; Restore", "設定のバックアップと復元")) + "</h2>";
+  html += "<p class='note'>" + String(tr("Back up or restore all M5ChainOSC settings as versioned JSON. WiFi credentials are not included.", "M5ChainOSCの全設定をバージョン付きJSONでバックアップ・復元します。Wi-Fi認証情報は含まれません。")) + "</p>";
   html += "<input id='import-file' type='file' accept='application/json,.json' hidden onchange='importSettings()'>";
-  html += "<div class='tool-row'><a href='/export_settings'>Export Settings (JSON)</a>";
-  html += "<button type='button' onclick='chooseSettingsFile()'>Import Settings (JSON)</button></div>";
+  html += "<div class='tool-row'><a href='/export_settings'>" + String(tr("Export Settings (JSON)", "設定をエクスポート（JSON）")) + "</a>";
+  html += "<button type='button' onclick='chooseSettingsFile()'>" + String(tr("Import Settings (JSON)", "設定をインポート（JSON）")) + "</button></div>";
   html += "<p id='import-status' class='meta tool-status'></p></div>";
 
-  html += "<div class='card'><h2>Display Rotation</h2>";
-  html += "<p class='meta'>Current: <strong>" + String((int)displayRotation * 90) + "&deg;</strong> (index " + String(displayRotation) + ")</p>";
+  html += "<div class='card'><h2>" + String(tr("Display Rotation", "画面の回転")) + "</h2>";
+  html += "<p class='meta'>" + String(tr("Current", "現在")) + ": <strong>" + String((int)displayRotation * 90) + "&deg;</strong> (index " + String(displayRotation) + ")</p>";
   html += "<div class='rot-row'>";
   for (int r = 0; r < 4; r++) {
     bool cur = ((int)displayRotation == r);
@@ -478,12 +574,38 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
   }
   html += "</div></div>";
 
-  html += "<form action='/save' method='POST' onsubmit='return validateForm()'><div class='card'><h2>OSC Destination</h2>";
+  html += "<form action='/save' method='POST' onsubmit='return validateForm()'><div class='card'><h2>" + String(tr("OSC Destination", "OSC送信先")) + "</h2>";
   html += "<label>Host IP</label><input name='host' value='" + htmlEscape(osc_host) + "'>";
   html += "<label>Port</label><input type='number' name='port' value='" + String(osc_port) + "'></div>";
 
   if (deviceCount == 0)
-    html += "<div class='card'><p class='note'>No device connected.</p></div>";
+    html += "<div class='card'><p class='note'>" + String(tr("No device connected.", "デバイスが接続されていません。")) + "</p></div>";
+
+  WEB_PERF_LOG(requestId, requestStart, "HEADER_BUILT", html.length(), 0);
+
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.sendHeader("Cache-Control", "no-store");
+  uint32_t sendStarted = millis();
+  server.send(200, "text/html; charset=utf-8", "");
+  WEB_PERF_LOG(requestId, requestStart, "HEADER_SENT", 0,
+               millis() - sendStarted);
+  auto flushHtml = [requestId, requestStart](const char* phase) -> bool {
+    if (!server.client().connected()) {
+      WEB_PERF_LOG(requestId, requestStart, phase, html.length(), 0);
+      html.remove(0);
+      return false;
+    }
+    size_t chunkBytes = html.length();
+    uint32_t chunkStarted = millis();
+    server.sendContent(html);
+    uint32_t chunkMs = millis() - chunkStarted;
+    html.remove(0);
+    yield();
+    WEB_PERF_LOG(requestId, requestStart, phase, chunkBytes, chunkMs);
+    return server.client().connected();
+  };
+  if (!flushHtml("COMMON_SENT")) return;
+  html.reserve(12000);
 
   for (int i = 0; i < deviceCount; i++) {
     if (!devices[i].active) continue;
@@ -496,14 +618,14 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
     html += "<div class='card device'><div class='device-head'><h2>";
     html += "<span class='badge badge-type'>" + String(typeToName(devices[i].type)) + "</span>";
     html += " #" + String(devices[i].chainId);
-    html += " <span class='badge badge-on'>Connected</span></h2>";
+    html += " <span class='badge badge-on'>" + String(tr("Connected", "接続済み")) + "</span></h2>";
     if (!ph && devices[i].type != CHAIN_UNKNOWN_TYPE_CODE) {
-      html += "<div class='device-menu-wrap'><button class='more-button' type='button' aria-label='Device menu' aria-expanded='false' onclick='toggleDeviceMenu(event," + idx + ")'>&hellip;</button>";
+      html += "<div class='device-menu-wrap'><button class='more-button' type='button' aria-label='" + String(tr("Device menu", "デバイスメニュー")) + "' aria-expanded='false' onclick='toggleDeviceMenu(event," + idx + ")'>&hellip;</button>";
       html += "<div id='device-menu-" + idx + "' class='device-menu' onclick='event.stopPropagation()'>";
-      html += "<button type='button' onclick=\"identifyDevice(" + idx + ",'" + devices[i].uid + "')\">Identify Device (Orange LED for 10s)</button>";
-      html += "<div class='menu-note'>Device preset (UID and Device Name are not included)</div>";
-      html += "<a href='/export_device_preset?index=" + idx + "' onclick='closeDeviceMenus()'>Export Preset (JSON)</a>";
-      html += "<button type='button' onclick='chooseDevicePreset(" + idx + ")'>Import Preset (JSON)</button>";
+      html += "<button type='button' onclick=\"identifyDevice(" + idx + ",'" + devices[i].uid + "')\">" + String(tr("Identify Device (Orange LED for 10s)", "デバイスを識別（LEDを10秒間オレンジ点灯）")) + "</button>";
+      html += "<div class='menu-note'>" + String(tr("Device preset (UID and Device Name are not included)", "デバイスプリセット（UIDとデバイス名は含まれません）")) + "</div>";
+      html += "<a href='/export_device_preset?index=" + idx + "' onclick='closeDeviceMenus()'>" + String(tr("Export Preset (JSON)", "プリセットをエクスポート（JSON）")) + "</a>";
+      html += "<button type='button' onclick='chooseDevicePreset(" + idx + ")'>" + String(tr("Import Preset (JSON)", "プリセットをインポート（JSON）")) + "</button>";
       html += "<p id='preset-status-" + idx + "' class='preset-status'></p></div></div>";
     }
     html += "</div>";
@@ -512,26 +634,26 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
       html += "<input id='preset-file-" + idx + "' type='file' accept='application/json,.json' hidden onchange='importDevicePreset(" + idx + ",this)'>";
     if (ph) html += "<p class='note'>UID取得失敗（仮ID）。設定は保存されません。</p>";
     if (devices[i].type != CHAIN_KEY_TYPE_CODE)
-      html += "<label>Device Name</label><input maxlength='64' name='nm_" + idx + "' value='" + htmlEscape(devices[i].displayName) + "' oninput='limitBytes(this,64)'>";
+      html += "<label>" + String(tr("Device Name", "デバイス名")) + "</label><input maxlength='64' name='nm_" + idx + "' value='" + htmlEscape(devices[i].displayName) + "' oninput='limitBytes(this,64)'>";
     html += "<input type='hidden' name='uid_" + idx + "' value='" + htmlEscape(devices[i].uid) + "'>";
 
     if (devices[i].type == CHAIN_KEY_TYPE_CODE) {
-      html += "<div class='key-grid'><div><label>Device Name</label><input maxlength='64' name='nm_" + idx + "' value='" + htmlEscape(devices[i].displayName) + "' oninput='limitBytes(this,64)'></div>";
-      html += "<div><label>Key Mode</label><select name='md_" + idx + "' onchange=\"toggleClickMode('kpr_" + idx + "','ksq_" + idx + "',this)\">";
+      html += "<div class='key-grid'><div><label>" + String(tr("Device Name", "デバイス名")) + "</label><input maxlength='64' name='nm_" + idx + "' value='" + htmlEscape(devices[i].displayName) + "' oninput='limitBytes(this,64)'></div>";
+      html += "<div><label>" + String(tr("Key Mode", "キーモード")) + "</label><select name='md_" + idx + "' onchange=\"toggleClickMode('kpr_" + idx + "','ksq_" + idx + "',this)\">";
       html += "<option value='0'" + String(!isSeq ? " selected" : "") + ">Press / Release</option>";
       html += "<option value='1'" + String(isSeq ? " selected" : "") + ">Sequence</option></select></div></div>";
       html += clickMessagesHtml(idx,"k",isSeq,devices[i].pressMessages,devices[i].pressMessageCount,devices[i].releaseMessages,devices[i].releaseMessageCount);
-      html += "<div id='ksq_" + idx + "' class='sequence-card' style='display:" + String(isSeq ? "block" : "none") + "'><h3>Advance the value on each press</h3><p class='note'>Move from Start by Step and return to Start after End.</p><div class='seq-grid'>";
+      html += "<div id='ksq_" + idx + "' class='sequence-card' style='display:" + String(isSeq ? "block" : "none") + "'><h3>" + String(tr("Advance the value on each press", "押すたびに値を進める")) + "</h3><p class='note'>" + String(tr("Move from Start by Step and return to Start after End.", "StartからStepずつ進み、Endを超えるとStartへ戻ります。")) + "</p><div class='seq-grid'>";
       html += "<div class='seq-address'><label>OSC Address</label><input maxlength='192' name='sa_" + idx + "' value='" + htmlEscape(devices[i].seq.address) + "' oninput='limitBytes(this,192)'></div>";
       html += "<div><label>Start</label><input type='number' step='any' name='ss_" + idx + "' value='" + String(devices[i].seq.start) + "'></div>";
       html += "<div><label>End</label><input type='number' step='any' name='se_" + idx + "' value='" + String(devices[i].seq.end) + "'></div>";
       html += "<div><label>Step</label><input type='number' step='any' name='sp_" + idx + "' value='" + String(devices[i].seq.step) + "'></div>";
-      html += "<div><label>Type</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
+      html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
-      html += "<div class='enc'><strong>Encoder Rotation</strong>";
+      html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong>";
       html += "<label>Rotation Address</label><input name='er_" + idx + "' value='" + htmlEscape(devices[i].enc.rotAddr) + "'>";
-      html += "<label>Mode</label><select name='ei_" + idx + "'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">Absolute</option>";
-      html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">Increment</option></select>";
+      html += "<label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
+      html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select>";
       html += "<label>Abs In Min</label><input type='number' step='any' name='e0_" + idx + "' value='" + String(devices[i].enc.absInMin) + "'>";
       html += "<label>Abs In Max</label><input type='number' step='any' name='e1_" + idx + "' value='" + String(devices[i].enc.absInMax) + "'>";
       html += "<label>Inc Scale</label><input type='number' step='any' name='es_" + idx + "' value='" + String(devices[i].enc.incScale) + "'>";
@@ -541,16 +663,16 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
       html += "<div class='click-section encoder-click'>";
       html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
-      html += "<div id='esq_" + idx + "' class='click-sequence' style='display:" + String(encSeq ? "block" : "none") + "'><strong>Click Sequence</strong>";
+      html += "<div id='esq_" + idx + "' class='click-sequence' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
       html += "<label>Address</label><input name='ek_" + idx + "' value='" + htmlEscape(devices[i].enc.clickSeq.address) + "'>";
       html += "<label>Start</label><input type='number' step='any' name='en_" + idx + "' value='" + String(devices[i].enc.clickSeq.start) + "'>";
       html += "<label>End</label><input type='number' step='any' name='e2_" + idx + "' value='" + String(devices[i].enc.clickSeq.end) + "'>";
       html += "<label>Step</label><input type='number' step='any' name='e3_" + idx + "' value='" + String(devices[i].enc.clickSeq.step) + "'>";
-      html += "<label>Type</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div>";
+      html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       html += "<div class='ang'><strong>Angle</strong>";
       html += "<label>Address</label><input name='aa_" + idx + "' value='" + htmlEscape(devices[i].angle.addr) + "'>";
-      html += "<label>Resolution</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
+      html += "<label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
       html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select>";
       html += "<label>Deadband</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'>";
       html += "<label>Out Min</label><input type='number' step='any' name='ao_" + idx + "' value='" + String(devices[i].angle.map.outMin) + "'>";
@@ -571,33 +693,35 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
       html += "<div class='click-section joystick-click'>";
       html += clickModeHtml("jm_" + idx, devices[i].joy.clickMode, "jpr_" + idx, "jsq_" + idx);
       html += clickMessagesHtml(idx,"j",joySeq,devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount);
-      html += "<div id='jsq_" + idx + "' class='click-sequence' style='display:" + String(joySeq ? "block" : "none") + "'><strong>Click Sequence</strong>";
+      html += "<div id='jsq_" + idx + "' class='click-sequence' style='display:" + String(joySeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
       html += "<label>Address</label><input name='jk_" + idx + "' value='" + htmlEscape(devices[i].joy.clickSeq.address) + "'>";
       html += "<label>Start</label><input type='number' step='any' name='jn_" + idx + "' value='" + String(devices[i].joy.clickSeq.start) + "'>";
       html += "<label>End</label><input type='number' step='any' name='j2_" + idx + "' value='" + String(devices[i].joy.clickSeq.end) + "'>";
       html += "<label>Step</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
-      html += "<label>Type</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div>";
+      html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
       html += "<div class='ang'><strong>ToF Distance (mm)</strong>";
       html += "<label>Address</label><input name='fa_" + idx + "' value='" + htmlEscape(devices[i].tof.addr) + "'>";
       html += "<label>Deadband (mm)</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
       html += "<label>Maximum Distance (mm)</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'>";
-      html += "<label>Output Direction</label><select name='fi_" + idx + "'>";
-      html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">Near → Out Min / Far → Out Max</option>";
-      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">Near → Out Max / Far → Out Min</option></select>";
+      html += "<label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
+      html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Min / Far → Out Max", "近い → Out Min / 遠い → Out Max")) + "</option>";
+      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Max / Far → Out Min", "近い → Out Max / 遠い → Out Min")) + "</option></select>";
       html += "<label>Out Min</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'>";
       html += "<label>Out Max</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'>";
       html += "<label>Out Type</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType);
-      html += "<p class='note'>Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.</p></div>";
+      html += "<p class='note'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、Maximum Distance未満です。範囲外ではOSC送信を停止します。")) + "</p></div>";
     } else {
       html += "<p class='note'>Type code: " + String((int)devices[i].type) + "</p>";
     }
     html += "</div>";
+    if (!flushHtml("DEVICE_SENT")) return;
   }
-  html += "<button type='submit'>Save All Settings</button></form>";
+  html += "<button type='submit'>" + String(tr("Save All Settings", "すべての設定を保存")) + "</button></form>";
 
-  html += "<div class='card saved-settings'><h2>Saved Device Settings</h2>";
-  html += "<p class='note'>Save したデバイスのみ表示。</p></div>";
+  html += "<div class='card saved-settings'><h2>" + String(tr("Saved Device Settings", "保存済みデバイス設定")) + "</h2>";
+  html += "<p class='note'>" + String(tr("Only devices whose settings have been saved are shown.", "設定を保存したデバイスのみ表示します。")) + "</p></div>";
+  if (!flushHtml("SAVED_HEADER_SENT")) return;
   for (int i = 0; i < MAX_KNOWN; i++) {
     if (!knownDevices[i].used || isPlaceholderUid(knownDevices[i].uid)) continue;
     bool con = isUidConnected(knownDevices[i].uid);
@@ -607,16 +731,25 @@ window.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.osc-
     html += "<div class='card'><h2>";
     html += "<span class='badge badge-type'>" + String(typeToName(knownDevices[i].type)) + "</span> ";
     html += htmlEscape(label) + " ";
-    html += con ? "<span class='badge badge-on'>Connected</span>" : "<span class='badge badge-off'>Off</span>";
+    html += con ? String("<span class='badge badge-on'>") + tr("Connected", "接続済み") + "</span>" : String("<span class='badge badge-off'>") + tr("Off", "未接続") + "</span>";
     html += "</h2>";
     html += "<p class='meta'>Type: <strong>" + String(typeToName(knownDevices[i].type)) + "</strong></p>";
     html += "<div class='uid'>" + htmlEscape(knownDevices[i].uid) + "</div>";
-    html += "<form action='/delete_device' method='POST' onsubmit=\"return confirm('Delete?');\">";
+    html += "<form action='/delete_device' method='POST' onsubmit=\"return confirm('" + String(tr("Delete these settings?", "この設定を削除しますか？")) + "');\">";
     html += "<input type='hidden' name='uid' value='" + htmlEscape(knownDevices[i].uid) + "'>";
-    html += "<button class='btn-warning' type='submit'>Delete Settings</button></form></div>";
+    html += "<button class='btn-warning' type='submit'>" + String(tr("Delete Settings", "設定を削除")) + "</button></form></div>";
+    if (!flushHtml("SAVED_DEVICE_SENT")) return;
   }
   html += "</body></html>";
-  server.send(200, "text/html", html);
+  if (!flushHtml("FOOTER_SENT")) return;
+  if (server.client().connected()) {
+    uint32_t finalStarted = millis();
+    server.sendContent("");
+    WEB_PERF_LOG(requestId, requestStart, "END", 0,
+                 millis() - finalStarted);
+  } else {
+    WEB_PERF_LOG(requestId, requestStart, "ABORT_END", 0, 0);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -641,7 +774,7 @@ void handleSave() {
       devices[i].displayName = server.arg("nm_" + idx);
       devices[i].displayName.trim();
       if (devices[i].displayName.length() > MAX_DEVICE_NAME_BYTES) {
-        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>Device Name is too long. Reduce it and try again.</p><p><a href='/'>Back</a></p>");
+        sendUiResult(400, tr("Save error", "保存エラー"), tr("Device Name is too long. Reduce it and try again.", "デバイス名が長すぎます。短くしてからもう一度お試しください。"));
         return;
       }
     }
@@ -655,7 +788,7 @@ void handleSave() {
       Serial.printf("[M5OSC][WEB] KEY parsed idx=%d uid=%s press=%d release=%d\n", i, devices[i].uid.c_str(), pc, rc);
 #endif
       if (pc + rc > MAX_KEY_OSC_MESSAGES) {
-        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>Press and Release messages must total 8 or fewer.</p><p><a href='/'>Back</a></p>");
+        sendUiResult(400, tr("Save error", "保存エラー"), tr("Press and Release messages must total 8 or fewer.", "PressとReleaseのメッセージは合計8件以内にしてください。"));
         return;
       }
       candidate.pressMessageCount = (uint8_t)pc;
@@ -666,7 +799,7 @@ void handleSave() {
         candidate.pressMessages[m].valueStr = server.arg("kpv_" + idx + "_" + String(m));
         candidate.pressMessages[m].valueType = (ValueType)constrain(server.arg("kpt_" + idx + "_" + String(m)).toInt(), (int)TYPE_FLOAT, (int)TYPE_STRING);
         if (!validOscMessage(candidate.pressMessages[m], validationError)) {
-          server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>Press message " + String(m + 1) + ": " + htmlEscape(validationError) + "</p><p><a href='/'>Back</a></p>"); return;
+          sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Press message ", "Pressメッセージ ")) + String(m + 1) + ": " + validationError); return;
         }
       }
       for (int m = 0; m < rc; m++) {
@@ -674,7 +807,7 @@ void handleSave() {
         candidate.releaseMessages[m].valueStr = server.arg("krv_" + idx + "_" + String(m));
         candidate.releaseMessages[m].valueType = (ValueType)constrain(server.arg("krt_" + idx + "_" + String(m)).toInt(), (int)TYPE_FLOAT, (int)TYPE_STRING);
         if (!validOscMessage(candidate.releaseMessages[m], validationError)) {
-          server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>Release message " + String(m + 1) + ": " + htmlEscape(validationError) + "</p><p><a href='/'>Back</a></p>"); return;
+          sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Release message ", "Releaseメッセージ ")) + String(m + 1) + ": " + validationError); return;
         }
       }
       if (pc > 0) candidate.press = candidate.pressMessages[0];
@@ -682,7 +815,7 @@ void handleSave() {
       if (server.hasArg("sa_" + idx)) candidate.seq.address = server.arg("sa_" + idx);
       candidate.seq.address.trim();
       if (!validOscAddressText(candidate.seq.address, validationError)) {
-        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>Sequence: " + htmlEscape(validationError) + "</p><p><a href='/'>Back</a></p>"); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), String("Sequence: ") + validationError); return;
       }
       if (server.hasArg("ss_" + idx)) candidate.seq.start = server.arg("ss_" + idx).toFloat();
       if (server.hasArg("se_" + idx)) candidate.seq.end = server.arg("se_" + idx).toFloat();
@@ -690,7 +823,7 @@ void handleSave() {
       if (server.hasArg("st_" + idx)) candidate.seq.valueType = (ValueType)constrain(server.arg("st_" + idx).toInt(), (int)TYPE_FLOAT, (int)TYPE_STRING);
       normalizeSequence(candidate.seq);
       if (deviceConfigStorageBytes(candidate) > MAX_DEVICE_CONFIG_BYTES) {
-        server.send(413, "text/html; charset=utf-8", "<h2>Save error</h2><p>The device configuration is too large. Delete messages or shorten Address and Value fields.</p><p><a href='/'>Back</a></p>"); return;
+        sendUiResult(413, tr("Save error", "保存エラー"), tr("The device configuration is too large. Delete messages or shorten Address and Value fields.", "デバイス設定の容量が大きすぎます。メッセージを削除するか、AddressとValueを短くしてください。")); return;
       }
       devices[i] = candidate;
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
@@ -740,14 +873,14 @@ void handleSave() {
       candidate.addr.trim();
       String validationError;
       if (!validOscAddressText(candidate.addr, validationError)) {
-        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>ToF Address: " + htmlEscape(validationError) + "</p><p><a href='/'>Back</a></p>"); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), String("ToF Address: ") + validationError); return;
       }
       if (server.hasArg("fd_" + idx)) candidate.deadband = server.arg("fd_" + idx).toInt();
       if (server.hasArg("fm_" + idx)) candidate.maxDistanceMm = server.arg("fm_" + idx).toInt();
       candidate.nearValueHigh = server.hasArg("fi_" + idx) && server.arg("fi_" + idx).toInt() != 0;
       if (candidate.deadband < 1 || candidate.deadband > 2000 ||
           candidate.maxDistanceMm < 31 || candidate.maxDistanceMm > 2000) {
-        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>ToF Maximum Distance must be 31–2000 mm and Deadband must be 1–2000 mm.</p><p><a href='/'>Back</a></p>"); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), tr("ToF Maximum Distance must be 31–2000 mm and Deadband must be 1–2000 mm.", "ToFのMaximum Distanceは31～2000 mm、Deadbandは1～2000 mmに設定してください。")); return;
       }
       if (server.hasArg("fo_" + idx)) candidate.map.outMin = server.arg("fo_" + idx).toFloat();
       if (server.hasArg("fO_" + idx)) candidate.map.outMax = server.arg("fO_" + idx).toFloat();
@@ -756,7 +889,7 @@ void handleSave() {
         candidate.map.outType = (t == TYPE_INT) ? TYPE_INT : TYPE_FLOAT;
       }
       if (!isfinite(candidate.map.outMin) || !isfinite(candidate.map.outMax)) {
-        server.send(400, "text/html; charset=utf-8", "<h2>Save error</h2><p>ToF output range is invalid.</p><p><a href='/'>Back</a></p>"); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), tr("ToF output range is invalid.", "ToFの出力範囲が正しくありません。")); return;
       }
       candidate.map.inMin = 30;
       candidate.map.inMax = candidate.maxDistanceMm;
@@ -766,11 +899,11 @@ void handleSave() {
     }
 
     if (!isPlaceholderUid(devices[i].uid) && !saveDeviceSettings(devices[i])) {
-      server.send(507, "text/html; charset=utf-8", "<h2>Save error</h2><p>The device configuration could not be written to storage. Delete messages or shorten Address and Value fields, then try again.</p><p><a href='/'>Back</a></p>");
+      sendUiResult(507, tr("Save error", "保存エラー"), tr("The device configuration could not be written to storage. Delete messages or shorten Address and Value fields, then try again.", "デバイス設定をストレージへ書き込めませんでした。メッセージを削除するか、AddressとValueを短くしてからもう一度お試しください。"));
       return;
     }
   }
-  server.send(200, "text/html", "<h2>Saved!</h2><p><a href='/'>Back</a></p>");
+  sendUiResult(200, tr("Saved!", "保存しました！"), tr("All settings were saved.", "すべての設定を保存しました。"));
 }
 
 void handleSetRotation() {
@@ -791,7 +924,7 @@ void handleDeleteWifi() {
   prefs.begin("wifi", false);
   prefs.clear();
   prefs.end();
-  server.send(200, "text/html", "<h2>WiFi deleted</h2>");
+  sendUiResult(200, tr("WiFi deleted", "Wi-Fi設定を削除しました"), tr("The device will restart.", "デバイスを再起動します。"), false);
   delay(1200);
   ESP.restart();
 }
@@ -802,7 +935,7 @@ void handleDeleteDevice() {
     return;
   }
   deleteDeviceSettingsByUid(server.arg("uid"));
-  server.send(200, "text/html", "<h2>Deleted</h2><p><a href='/'>Back</a></p>");
+  sendUiResult(200, tr("Deleted", "削除しました"), tr("The saved device settings were deleted.", "保存済みデバイス設定を削除しました。"));
 }
 
 static int requestedActiveDeviceIndex() {
@@ -820,20 +953,20 @@ static int requestedActiveDeviceIndex() {
 void handleIdentifyDevice() {
   int index = requestedActiveDeviceIndex();
   if (index < 0 || !server.hasArg("uid") || server.arg("uid") != devices[index].uid) {
-    server.send(404, "text/plain; charset=utf-8", "The selected connected device was not found.");
+    server.send(404, "text/plain; charset=utf-8", tr("The selected connected device was not found.", "選択した接続済みデバイスが見つかりません。"));
     return;
   }
   if (!identifyChainDevice(index, server.arg("uid"))) {
-    server.send(502, "text/plain; charset=utf-8", "The device LED could not be changed.");
+    server.send(502, "text/plain; charset=utf-8", tr("The device LED could not be changed.", "デバイスのLEDを変更できませんでした。"));
     return;
   }
-  server.send(200, "text/plain; charset=utf-8", "Orange LED active for 10 seconds.");
+  server.send(200, "text/plain; charset=utf-8", tr("Orange LED active for 10 seconds.", "LEDを10秒間オレンジ色に点灯します。"));
 }
 
 void handleExportDevicePreset() {
   int index = requestedActiveDeviceIndex();
   if (index < 0) {
-    server.send(404, "text/plain; charset=utf-8", "The selected connected device was not found.");
+    server.send(404, "text/plain; charset=utf-8", tr("The selected connected device was not found.", "選択した接続済みデバイスが見つかりません。"));
     return;
   }
 
@@ -847,17 +980,17 @@ void handleExportDevicePreset() {
 void handleImportDevicePreset() {
   int index = requestedActiveDeviceIndex();
   if (index < 0) {
-    server.send(404, "text/plain; charset=utf-8", "The selected connected device was not found.");
+    server.send(404, "text/plain; charset=utf-8", tr("The selected connected device was not found.", "選択した接続済みデバイスが見つかりません。"));
     return;
   }
 
   String body = server.arg("plain");
   if (!body.length()) {
-    server.send(400, "text/plain; charset=utf-8", "Preset file is empty.");
+    server.send(400, "text/plain; charset=utf-8", tr("Preset file is empty.", "プリセットファイルが空です。"));
     return;
   }
   if (body.length() > 16384) {
-    server.send(413, "text/plain; charset=utf-8", "Preset file exceeds 16 KiB.");
+    server.send(413, "text/plain; charset=utf-8", tr("Preset file exceeds 16 KiB.", "プリセットファイルが16 KiBを超えています。"));
     return;
   }
 
@@ -865,18 +998,18 @@ void handleImportDevicePreset() {
   DeserializationError parseError = deserializeJson(document, body);
   body = "";
   if (parseError) {
-    server.send(400, "text/plain; charset=utf-8", "Invalid JSON: " + String(parseError.c_str()));
+    server.send(400, "text/plain; charset=utf-8", String(tr("Invalid JSON: ", "JSONが正しくありません: ")) + parseError.c_str());
     return;
   }
 
   JsonObject root = document.as<JsonObject>();
   if (root.isNull() || !root["format"].is<const char*>() ||
       String(root["format"].as<const char*>()) != "M5ChainOSC-device-preset") {
-    server.send(400, "text/plain; charset=utf-8", "This is not an M5ChainOSC device preset.");
+    server.send(400, "text/plain; charset=utf-8", tr("This is not an M5ChainOSC device preset.", "M5ChainOSCのデバイスプリセットではありません。"));
     return;
   }
   if (!root["schemaVersion"].is<int>() || root["schemaVersion"].as<int>() != 1) {
-    server.send(400, "text/plain; charset=utf-8", "Unsupported or missing preset schemaVersion.");
+    server.send(400, "text/plain; charset=utf-8", tr("Unsupported or missing preset schemaVersion.", "プリセットのschemaVersionがないか、対応していません。"));
     return;
   }
   if (!root["deviceType"].is<int>() ||
@@ -893,26 +1026,26 @@ void handleImportDevicePreset() {
 
   ChainDevice* candidate = new (std::nothrow) ChainDevice();
   if (!candidate) {
-    server.send(503, "text/plain; charset=utf-8", "Not enough memory to validate the preset.");
+    server.send(503, "text/plain; charset=utf-8", tr("Not enough memory to validate the preset.", "プリセットを検証するためのメモリが不足しています。"));
     return;
   }
   String validationError;
   JsonObjectConst presetObject = root;
   if (!deviceFromJson(presetObject, *candidate, validationError)) {
     delete candidate;
-    server.send(400, "text/plain; charset=utf-8", "Invalid preset: " + validationError);
+    server.send(400, "text/plain; charset=utf-8", String(tr("Invalid preset: ", "プリセットが正しくありません: ")) + validationError);
     return;
   }
   if (!saveDeviceSettings(*candidate)) {
     delete candidate;
-    server.send(507, "text/plain; charset=utf-8", "The preset could not be written to storage.");
+    server.send(507, "text/plain; charset=utf-8", tr("The preset could not be written to storage.", "プリセットをストレージへ書き込めませんでした。"));
     return;
   }
   delete candidate;
 
   loadDeviceSettings(devices[index]);
   server.send(200, "text/plain; charset=utf-8",
-              "Preset imported for " + String(typeToName(devices[index].type)) + ".");
+              String(tr("Preset imported for ", "プリセットをインポートしました: ")) + String(typeToName(devices[index].type)) + ".");
 }
 
 void handleExportSettings() {
@@ -926,7 +1059,8 @@ void handleExportSettings() {
                   ",\"wifiCredentialsIncluded\":false" +
                   ",\"global\":{\"oscHost\":" + jsonString(osc_host) +
                   ",\"oscPort\":" + String(osc_port) +
-                  ",\"displayRotation\":" + String(displayRotation) + "},\"devices\":[";
+                  ",\"displayRotation\":" + String(displayRotation) +
+                  ",\"uiLanguage\":" + jsonString(isJapaneseUi() ? "ja" : "en") + "},\"devices\":[";
   server.sendContent(header);
 
   bool first = true;
@@ -948,41 +1082,49 @@ void handleExportSettings() {
 
 void handleImportSettings() {
   String body = server.arg("plain");
-  if (!body.length()) { server.send(400, "text/plain; charset=utf-8", "Import file is empty."); return; }
-  if (body.length() > 49152) { server.send(413, "text/plain; charset=utf-8", "Import file exceeds 48 KiB."); return; }
+  if (!body.length()) { server.send(400, "text/plain; charset=utf-8", tr("Import file is empty.", "インポートファイルが空です。")); return; }
+  if (body.length() > 49152) { server.send(413, "text/plain; charset=utf-8", tr("Import file exceeds 48 KiB.", "インポートファイルが48 KiBを超えています。")); return; }
 
   DynamicJsonDocument document(65536);
   DeserializationError parseError = deserializeJson(document, body);
   body = "";
   if (parseError) {
-    server.send(400, "text/plain; charset=utf-8", "Invalid JSON: " + String(parseError.c_str())); return;
+    server.send(400, "text/plain; charset=utf-8", String(tr("Invalid JSON: ", "JSONが正しくありません: ")) + parseError.c_str()); return;
   }
   JsonObjectConst root = document.as<JsonObjectConst>();
   if (!root["format"].is<const char*>() || String(root["format"].as<const char*>()) != SETTINGS_FORMAT_NAME) {
-    server.send(400, "text/plain; charset=utf-8", "This is not an M5ChainOSC settings file."); return;
+    server.send(400, "text/plain; charset=utf-8", tr("This is not an M5ChainOSC settings file.", "M5ChainOSCの全体設定ファイルではありません。")); return;
   }
   if (!root["schemaVersion"].is<int>()) {
-    server.send(400, "text/plain; charset=utf-8", "schemaVersion is missing."); return;
+    server.send(400, "text/plain; charset=utf-8", tr("schemaVersion is missing.", "schemaVersionがありません。")); return;
   }
   int version = root["schemaVersion"].as<int>();
   if (version != SETTINGS_SCHEMA_VERSION) {
-    server.send(400, "text/plain; charset=utf-8", "Unsupported schemaVersion: " + String(version)); return;
+    server.send(400, "text/plain; charset=utf-8", String(tr("Unsupported schemaVersion: ", "対応していないschemaVersionです: ")) + String(version)); return;
   }
   JsonObjectConst global = root["global"].as<JsonObjectConst>();
   JsonArrayConst importedDevices = root["devices"].as<JsonArrayConst>();
   if (global.isNull() || importedDevices.isNull() || importedDevices.size() > MAX_KNOWN ||
       !global["oscHost"].is<const char*>() || !global["oscPort"].is<int>() || !global["displayRotation"].is<int>()) {
-    server.send(400, "text/plain; charset=utf-8", "Global settings or device list is invalid."); return;
+    server.send(400, "text/plain; charset=utf-8", tr("Global settings or device list is invalid.", "共通設定またはデバイス一覧が正しくありません。")); return;
   }
   String importedHost = global["oscHost"].as<const char*>();
   int importedPort = global["oscPort"].as<int>();
   int importedRotation = global["displayRotation"].as<int>();
+  UiLanguage importedLanguage = uiLanguage;
+  if (global["uiLanguage"].is<const char*>()) {
+    String language = global["uiLanguage"].as<const char*>();
+    if (language != "en" && language != "ja") {
+      server.send(400, "text/plain; charset=utf-8", tr("uiLanguage must be en or ja.", "uiLanguageはenまたはjaで指定してください。")); return;
+    }
+    importedLanguage = language == "ja" ? UI_LANG_JAPANESE : UI_LANG_ENGLISH;
+  }
   if (!importedHost.length() || importedHost.length() > 253 || importedPort < 1 || importedPort > 65535 || importedRotation < 0 || importedRotation > 3) {
-    server.send(400, "text/plain; charset=utf-8", "Global OSC or display setting is out of range."); return;
+    server.send(400, "text/plain; charset=utf-8", tr("Global OSC or display setting is out of range.", "共通OSC設定または画面設定が範囲外です。")); return;
   }
 
   ChainDevice* candidate = new (std::nothrow) ChainDevice();
-  if (!candidate) { server.send(503, "text/plain; charset=utf-8", "Not enough memory to validate settings."); return; }
+  if (!candidate) { server.send(503, "text/plain; charset=utf-8", tr("Not enough memory to validate settings.", "設定を検証するためのメモリが不足しています。")); return; }
   String validationError;
   int deviceNumber = 0;
   for (size_t deviceIndex = 0; deviceIndex < importedDevices.size(); deviceIndex++) {
@@ -990,14 +1132,14 @@ void handleImportSettings() {
     deviceNumber = (int)deviceIndex + 1;
     if (!deviceFromJson(object, *candidate, validationError)) {
       delete candidate;
-      server.send(400, "text/plain; charset=utf-8", "Device " + String(deviceNumber) + ": " + validationError); return;
+      server.send(400, "text/plain; charset=utf-8", String(tr("Device ", "デバイス ")) + String(deviceNumber) + ": " + validationError); return;
     }
     for (size_t previousIndex = 0; previousIndex < deviceIndex; previousIndex++) {
       JsonObjectConst previous = importedDevices[previousIndex].as<JsonObjectConst>();
       if (previous["uid"].is<const char*>() && String(previous["uid"].as<const char*>()) == candidate->uid) {
         String duplicateUid = candidate->uid;
         delete candidate;
-        server.send(400, "text/plain; charset=utf-8", "Duplicate device UID: " + duplicateUid); return;
+        server.send(400, "text/plain; charset=utf-8", String(tr("Duplicate device UID: ", "デバイスUIDが重複しています: ")) + duplicateUid); return;
       }
     }
   }
@@ -1007,7 +1149,7 @@ void handleImportSettings() {
     deviceNumber++;
     if (!deviceFromJson(object, *candidate, validationError) || !saveDeviceSettings(*candidate)) {
       delete candidate;
-      server.send(507, "text/plain; charset=utf-8", "Storage write failed at device " + String(deviceNumber) + "."); return;
+      server.send(507, "text/plain; charset=utf-8", String(tr("Storage write failed at device ", "デバイス設定のストレージ書き込みに失敗しました: ")) + String(deviceNumber) + "."); return;
     }
   }
   delete candidate;
@@ -1015,10 +1157,12 @@ void handleImportSettings() {
   osc_host = importedHost;
   osc_port = importedPort;
   displayRotation = (uint8_t)importedRotation;
+  uiLanguage = importedLanguage;
   prefs.begin("osc", false); prefs.putString("host", osc_host); prefs.putInt("port", osc_port); prefs.end();
   saveDisplayRotation();
+  saveUiLanguage();
   applyDisplayRotation();
   refreshChainDevices(true);
   if (!isAPMode && !resetInProgress) drawMainScreen();
-  server.send(200, "text/plain; charset=utf-8", "Import completed. " + String(importedDevices.size()) + " device(s) restored.");
+  server.send(200, "text/plain; charset=utf-8", String(tr("Import completed. ", "インポートが完了しました。")) + String(importedDevices.size()) + tr(" device(s) restored.", "件のデバイス設定を復元しました。"));
 }

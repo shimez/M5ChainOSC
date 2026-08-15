@@ -757,6 +757,9 @@ void loadWifiAndOscCommon() {
   prefs.begin("ui", true);
   displayRotation = prefs.getUChar("rotation", 0);
   if (displayRotation > 3) displayRotation = 0;
+  uint8_t storedLanguage = prefs.getUChar("language", 0xff);
+  uiLanguageConfigured = storedLanguage <= UI_LANG_JAPANESE;
+  uiLanguage = uiLanguageConfigured ? (UiLanguage)storedLanguage : UI_LANG_ENGLISH;
   prefs.end();
 
   loadKnownList();
@@ -766,6 +769,13 @@ void saveDisplayRotation() {
   prefs.begin("ui", false);
   prefs.putUChar("rotation", displayRotation);
   prefs.end();
+}
+
+void saveUiLanguage() {
+  prefs.begin("ui", false);
+  prefs.putUChar("language", (uint8_t)uiLanguage);
+  prefs.end();
+  uiLanguageConfigured = true;
 }
 
 void resetAllSettings() {

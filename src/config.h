@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include "M5Chain.h"
 
+static const char* APP_VERSION = "1.3.0";
+
 // ---------------------------------------------------------------------------
 // Hardware / bus
 // ---------------------------------------------------------------------------
@@ -24,6 +26,9 @@ static const char* SETTINGS_FORMAT_NAME = "M5ChainOSC-settings";
 
 // Enable only while diagnosing NVS persistence.
 #define M5CHAINOSC_STORAGE_DEBUG 0
+
+// Enable only while diagnosing repeated Web UI reload performance.
+#define M5CHAINOSC_WEB_PERF_DEBUG 1
 
 // ---------------------------------------------------------------------------
 // Timing
@@ -51,4 +56,9 @@ enum ValueType : uint8_t {
 enum KeyMode : uint8_t {
   MODE_PRESS_RELEASE = 0,
   MODE_SEQUENCE      = 1
+};
+
+enum UiLanguage : uint8_t {
+  UI_LANG_ENGLISH  = 0,
+  UI_LANG_JAPANESE = 1
 };

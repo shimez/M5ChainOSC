@@ -3,20 +3,20 @@
 #include <M5Unified.h>
 #include "M5Chain.h"
 #include <WiFi.h>
-#include <WebServer.h>
 #include <DNSServer.h>
 #include <Preferences.h>
 #include <ArduinoOSCWiFi.h>
 #include <ESPmDNS.h>
 
 #include "config.h"
+#include "responsive_web_server.h"
 #include "types.h"
 
 // ---------------------------------------------------------------------------
 // Shared hardware / services
 // ---------------------------------------------------------------------------
 extern Chain       M5Chain;
-extern WebServer   server;
+extern ResponsiveWebServer server;
 extern DNSServer   dnsServer;
 extern Preferences prefs;
 
@@ -38,6 +38,8 @@ extern int    osc_port;
 extern String ipStr;
 extern String hostStr;
 extern uint8_t displayRotation;
+extern UiLanguage uiLanguage;
+extern bool       uiLanguageConfigured;
 
 extern String lastOscName;
 extern String lastOscAddr;

@@ -12,7 +12,10 @@ void startAPMode() {
   delay(500);
   dnsServer.start(DNS_PORT, "*", apIP);
 
+  const char* trackedHeaders[] = {"Accept-Language"};
+  server.collectHeaders(trackedHeaders, 1);
   server.on("/", handleAPRoot);
+  server.on("/set_language", HTTP_POST, handleSetLanguage);
   server.on("/save_wifi", handleSaveWiFi);
   server.onNotFound([]() { handleAPRoot(); });
   server.begin();

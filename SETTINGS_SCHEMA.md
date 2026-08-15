@@ -24,6 +24,7 @@ Version 2ではEncoder／Joystickのクリック`press`・`release`を、Keyと�
 
 - OSC送信先
 - 画面回転
+- Web UIの言語（`global.uiLanguage`: `en`または`ja`）
 - 保存済みデバイスのUID、種類、表示名
 - デバイス種類別のOSC設定
 - Chain KeyのPress、Release、Sequence設定
@@ -40,7 +41,8 @@ Wi-FiのSSIDとパスワードは含めません。`wifiCredentialsIncluded`は�
 - 全デバイスを検証してから保存開始
 - JSONに含まれるUIDの設定を上書き
 - JSONに含まれない既存デバイス設定は維持
-- OSC送信先と画面回転を復元
+- OSC送信先、画面回転、Web UIの言語を復元
+- `uiLanguage`がないVersion 2ファイルでは、現在の言語設定を維持
 - Wi-Fi設定は変更しない
 
 現在のアップロード上限は48 KiBです。
