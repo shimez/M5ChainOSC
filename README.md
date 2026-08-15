@@ -7,6 +7,12 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 > [!IMPORTANT]
 > M5ChainOSCは個人が開発する非公式プロジェクトです。M5Stack Technology Co., Ltd.による公式製品ではなく、同社との提携または承認を示すものではありません。
 
+## M5ChainOSCの特徴
+
+- **PCへの常駐アプリは不要**: AtomS3RからWi-Fi経由で、PC上のVRChatなどOSCを受信できるアプリケーションへ直接メッセージを送信します。
+- **ブラウザーだけで設定可能**: OSCの送信先やChainデバイスごとの動作を、同じネットワーク上のPCやスマートフォンから設定できます。
+- **セットアップ後はPCとのUSB接続が不要**: ファームウェアの書き込みなど初期セットアップ後は、PCから独立して利用できます。動作には給電が必要なため、USB ACアダプターやモバイルバッテリーなどへ接続してください。
+
 > [!NOTE]
 > Chain ToFを含む対応デバイスは実機での動作確認を行っています。
 
@@ -55,7 +61,7 @@ PlatformIOでは`platformio.ini`の`lib_deps`から自動取得されます。Ar
 5. AtomS3Rの再起動後、画面に表示されたIPアドレス、または`http://atoms3r-osc.local/`をブラウザーで開きます。
 6. OSC送信先と各Chainデバイスを設定し、`Save All Settings`を押します。
 
-詳しい操作方法は[日本語ユーザーガイド](docs/USER_GUIDE_ja.md)を参照してください。
+詳しい操作方法は[日本語ユーザーガイド](https://shimez.github.io/M5ChainOSC/user-guide/)を参照してください。ガイドのMarkdown原稿は[docs/USER_GUIDE_ja.md](docs/USER_GUIDE_ja.md)にあります。
 
 ## PlatformIO
 

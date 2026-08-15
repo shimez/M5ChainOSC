@@ -1,3 +1,9 @@
+---
+layout: default
+title: M5ChainOSC 日本語ユーザーガイド
+permalink: /user-guide/
+---
+
 # M5ChainOSC 日本語ユーザーガイド
 
 このガイドでは、AtomS3Rへの書き込みが完了した後の初期設定と、Web UIの使い方を説明します。
