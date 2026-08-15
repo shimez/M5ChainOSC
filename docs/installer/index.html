@@ -28,6 +28,7 @@
     .warning { margin-top:18px; border-left:3px solid #f5b942; padding-left:14px; color:#e6d7ae; font-size:14px; }
     footer { margin-top:22px; text-align:center; color:#77849a; font-size:13px; }
     footer a { color:#aebdf7; }
+    .license-note { margin:10px auto 0; max-width:680px; color:#8996aa; font-size:12px; line-height:1.7; }
     @media (max-width:520px) { main{padding-top:34px}.card{padding:21px} esp-web-install-button::part(activate){min-width:220px;width:100%} }
   </style>
 </head>
@@ -63,7 +64,13 @@
     </section>
 
     <footer>
-      <a href="https://github.com/shimez/M5ChainOSC">GitHub</a> · M5ChainOSC Web Installer
+      <div><a href="https://github.com/shimez/M5ChainOSC">GitHub</a> · M5ChainOSC Web Installer</div>
+      <p class="license-note">
+        M5ChainOSCの独自部分は<a href="https://github.com/shimez/M5ChainOSC/blob/main/LICENSE">MIT License</a>で提供されます。
+        配布ファームウェアにはLGPL-2.1などの第三者コンポーネントが含まれます。
+        詳細は<a href="https://github.com/shimez/M5ChainOSC/blob/main/THIRD_PARTY_NOTICES.md">Third-Party Notices</a>および
+        <a href="https://github.com/shimez/M5ChainOSC/blob/main/licenses/LGPL-2.1.txt">LGPL-2.1</a>を参照してください。
+      </p>
     </footer>
   </main>
 </body>

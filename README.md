@@ -141,6 +141,8 @@ AtomS3R本体の画面を10秒間長押しすると、Wi-Fi、OSC、デバイス
 ```text
 M5ChainOSC.ino          Arduino IDE用エントリーポイント
 platformio.ini          PlatformIO設定と依存ライブラリ
+LICENSE                 M5ChainOSC独自部分のMITライセンス
+THIRD_PARTY_NOTICES.md  第三者コンポーネントとライセンス情報
 src/
   main.cpp              共通実装とPlatformIO用エントリーポイント
   chain_devices.*       Chainデバイスの列挙・入力・OSC送信
@@ -156,6 +158,8 @@ presets/
   README.md              デバイスプリセット一覧と使用方法
   joystick/              Joystick用プリセット
   key/                   Key用プリセット
+licenses/
+  LGPL-2.1.txt           Arduino-ESP32に適用されるライセンス本文
 ```
 
 ## 現在の制限
@@ -170,6 +174,14 @@ presets/
 機能追加はブランチ単位で進めています。実機検証前の機能を含むブランチは、検証が完了するまで`main`へマージしない運用を推奨します。
 
 不具合報告では、使用したブランチまたはコミット、接続したChainデバイス、再現手順、Arduino IDE／PlatformIOのビルドログを添えてください。
+
+## ライセンス
+
+特に明記がない限り、M5ChainOSCの独自ソースコード、ドキュメントおよびプリセットは[MIT License](LICENSE)で提供されます。
+
+Web Installerなどで配布するコンパイル済みファームウェアには、LGPL-2.1やMITなど、各ライセンスで提供される第三者コンポーネントが含まれます。使用コンポーネント、固定バージョン、著作権表示および対応ソースへのリンクは[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照してください。Arduino-ESP32に適用されるLGPL-2.1の本文は[licenses/LGPL-2.1.txt](licenses/LGPL-2.1.txt)に収録しています。
+
+M5ChainOSCは個人開発の非公式プロジェクトです。MITライセンスは、M5Stack Technology Co., Ltd.その他の第三者の商標使用を許諾するものではありません。
 
 ## 開発クレジット
 
