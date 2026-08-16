@@ -7,7 +7,10 @@
 #include "config.h"
 
 namespace {
-constexpr uint32_t WEB_WRITE_STALL_TIMEOUT_MS = 1000;
+// Brief TCP back-pressure can exceed one second even while the browser is
+// still receiving the page. Keep the timeout bounded so abandoned reloads do
+// not block later requests, but allow enough time to avoid truncated HTML.
+constexpr uint32_t WEB_WRITE_STALL_TIMEOUT_MS = 3000;
 constexpr uint32_t WEB_WRITE_SELECT_SLICE_US = 50000;
 }
 
