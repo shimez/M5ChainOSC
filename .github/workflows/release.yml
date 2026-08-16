@@ -42,6 +42,7 @@ jobs:
         run: >-
           python scripts/check_release_version.py
           --tag "$RELEASE_TAG"
+          --check-installer-metadata
           --github-output "$GITHUB_OUTPUT"
 
       - name: Build with PlatformIO

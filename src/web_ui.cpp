@@ -3,6 +3,7 @@
 #include "storage.h"
 #include "display.h"
 #include "chain_devices.h"
+#include "memory_debug.h"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -113,6 +114,18 @@ static String messageRowHtml(const String& group, const String& prefix, const ch
   row += "<div class='field'><label>" + String(tr("Value", "値")) + "</label><input class='msg-value' maxlength='128' name='" + p + "v_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.valueStr) + "' oninput='limitAndValidate(this,128)'><small><span class='err'></span><span class='bytes'></span></small></div>";
   row += "<button type='button' class='remove-msg' onclick='removeMsg(this)'>" + String(tr("Delete", "削除")) + "</button></div>";
   return row;
+}
+
+static String addressInputHtml(const String& label, const String& name,
+                               const String& value,
+                               const String& extraClass = "") {
+  String classes = "address-field";
+  if (extraClass.length()) classes += " " + extraClass;
+  return "<div class='" + classes + "'><label>" + label +
+         "</label><input class='osc-address' maxlength='192' name='" + name +
+         "' value='" + htmlEscape(value) +
+         "' oninput='limitAndValidate(this,192)'><small><span class='err'></span>"
+         "<span class='bytes'></span></small></div>";
 }
 
 static String clickMessagesHtml(const String& idx, const String& prefix, bool sequenceMode,
@@ -468,6 +481,7 @@ void handleSetLanguage() {
 // Main settings page
 // ---------------------------------------------------------------------------
 void handleRoot() {
+  MEMORY_DEBUG_LOG("WEB_ROOT_BEGIN", 0);
   applyBrowserLanguageOnFirstVisit();
 #if M5CHAINOSC_WEB_PERF_DEBUG
   const uint32_t requestId = ++webPerfRequestSequence;
@@ -497,7 +511,7 @@ input.invalid,select.invalid{border:2px solid #c73c4a;background:#fff8f8}
 .usage{display:flex;justify-content:space-between;align-items:center;margin:14px 0;padding:11px 13px;border:1px solid #cddbf8;border-radius:9px;background:#edf3ff;color:#244da7}
 .event-tabs{display:flex;gap:4px;padding:4px;background:#edf0f4;border-radius:9px}.event-tab{margin:0;background:transparent;color:#697586}.event-tab.active{background:white;color:#18212f;box-shadow:0 1px 4px #bbb}
 .event-panel{margin-top:12px}.osc-list{display:grid;gap:10px}.osc-row{display:grid;grid-template-columns:62px minmax(180px,1fr) 115px minmax(100px,.55fr) 68px;gap:9px;align-items:start;padding:12px;border:1px solid #dce2ea;border-radius:10px;background:#fbfcfe}
-.osc-row .field label{margin-top:0}.osc-row small{display:flex;justify-content:space-between;min-height:17px;color:#697586}.osc-row .err{color:#c73c4a}.order{display:flex;gap:3px;align-self:center}.mv{width:auto;margin:0;padding:7px;background:#fff;color:#526075;border:1px solid #dce2ea}.remove-msg{width:auto;margin-top:22px;padding:9px;background:#fff3f4;color:#c73c4a;border:1px solid #efc6cb}.add-msg{background:#f7faff;color:#3267e3;border:1px dashed #9db6ef}.add-msg:disabled{background:#eee;color:#888}.empty{display:none;padding:18px;text-align:center;color:#697586;border:1px dashed #dce2ea;border-radius:9px}.osc-list:empty+.empty{display:block}
+.osc-row .field label{margin-top:0}.osc-row small,.address-field small{display:flex;justify-content:space-between;min-height:17px;color:#697586}.osc-row .err,.address-field .err{color:#c73c4a}.order{display:flex;gap:3px;align-self:center}.mv{width:auto;margin:0;padding:7px;background:#fff;color:#526075;border:1px solid #dce2ea}.remove-msg{width:auto;margin-top:22px;padding:9px;background:#fff3f4;color:#c73c4a;border:1px solid #efc6cb}.add-msg{background:#f7faff;color:#3267e3;border:1px dashed #9db6ef}.add-msg:disabled{background:#eee;color:#888}.empty{display:none;padding:18px;text-align:center;color:#697586;border:1px dashed #dce2ea;border-radius:9px}.osc-list:empty+.empty{display:block}
 .sequence-card{margin-top:12px;padding:15px;border:1px solid #dce2ea;border-radius:10px;background:#fbfcfe}.seq-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.seq-address{grid-column:1/-1}
 button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-radius:6px;font-size:16px;margin-top:8px}
 .save-bar{position:sticky;z-index:15;bottom:8px;display:flex;align-items:center;gap:12px;padding:10px 12px;margin-top:16px;background:rgba(255,255,255,.96);border:1px solid #dce2ea;border-radius:10px;box-shadow:0 5px 18px rgba(0,0,0,.14)}.save-bar button{flex:1;margin:0}.dirty-status{flex:0 0 auto;color:#a45a00;font-size:.9em;font-weight:bold}.dirty-status[hidden]{display:none}
@@ -540,9 +554,10 @@ function removeMsg(btn){let r=btn.closest('.osc-row'),g=r.dataset.group;r.remove
 function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>'+tx('OSC Address','OSCアドレス')+'</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>'+tx('Type','型')+'</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>'+tx('Value','値')+'</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">'+tx('Delete','削除')+'</button>';list.appendChild(r);renumber(g);markDirty();r.querySelector('.msg-address').focus()}
 function limitBytes(i,max){while(bytes(i.value)>max)i.value=i.value.slice(0,-1)}
 function limitAndValidate(i,max){limitBytes(i,max);validateInput(i)}
-function validateInput(i){let max=i.classList.contains('msg-address')?192:128,b=bytes(i.value),err='';if(i.classList.contains('msg-address')){if(!i.value)err=tx('Required','必須です');else if(i.value[0]!='/')err=tx('Start with /','/ から始めてください');else if(/[\s#*,?\[\]{}]/.test(i.value))err=tx('Invalid character','使用できない文字があります')}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err=tx('Invalid float','小数として正しくありません');if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err=tx('Invalid integer','整数として正しくありません')}if(b>max)err=tx('Too long','長すぎます');i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
+function validateInput(i){let isAddress=i.classList.contains('msg-address')||i.classList.contains('osc-address'),max=isAddress?192:128,b=bytes(i.value),err='';if(isAddress){if(!i.value)err=tx('Required','必須です');else if(i.value[0]!='/')err=tx('Start with /','/ から始めてください');else if(/[\s#*,?\[\]{}]/.test(i.value))err=tx('Invalid character','使用できない文字があります')}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err=tx('Invalid float','小数として正しくありません');if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err=tx('Invalid integer','整数として正しくありません')}if(b>max)err=tx('Too long','長すぎます');i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
+function initializeMessageRows(){let groups=new Set();document.querySelectorAll('.osc-row').forEach(row=>{groups.add(row.dataset.group);validateInput(row.querySelector('.msg-address'));validateInput(row.querySelector('.msg-value'))});document.querySelectorAll('.add-msg[data-group]').forEach(button=>groups.add(button.dataset.group));groups.forEach(group=>renumber(group));document.querySelectorAll('.osc-address').forEach(validateInput)}
 function rememberScroll(){sessionStorage.setItem('m5osc-scroll',String(window.scrollY))}
-function validateForm(){let ok=true;document.querySelectorAll('.osc-row .msg-address,.osc-row .msg-value').forEach(i=>{if(!validateInput(i))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC message fields.','赤く表示されたOSCメッセージ項目を修正してください。'))}return ok}
+function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC fields.','赤く表示されたOSC設定項目を修正してください。'))}return ok}
 let toastTimer;function showToast(message,success){let toast=document.getElementById('save-toast');toast.textContent=message;toast.className='toast '+(success?'success':'error')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),success?3000:6000)}
 async function saveSettings(event){event.preventDefault();if(!validateForm())return false;let form=event.currentTarget,button=form.querySelector('.save-bar button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));window.settingsSubmitting=true;button.disabled=true;button.textContent=tx('Saving...','保存中...');try{let response=await fetch('/save?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('Settings could not be saved.','設定を保存できませんでした。'));window.settingsDirty=false;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;showToast(message,true)}catch(error){showToast(error.message,false)}finally{window.settingsSubmitting=false;button.disabled=false;button.textContent=oldText}return false}
 async function deleteSavedDevice(event,form){event.preventDefault();if(!confirm(tx('Delete these settings?','この設定を削除しますか？')))return false;let button=form.querySelector('button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_device?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('The saved device settings could not be deleted.','保存済みデバイス設定を削除できませんでした。'));let card=form.closest('.saved-device-card');if(card)card.remove();showToast(message,true)}catch(error){button.disabled=false;button.textContent=oldText;showToast(error.message,false)}return false}
@@ -599,6 +614,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     html += "<div class='card'><p class='note'>" + String(tr("No device connected.", "デバイスが接続されていません。")) + "</p></div>";
 
   WEB_PERF_LOG(requestId, requestStart, "HEADER_BUILT", html.length(), 0);
+  MEMORY_DEBUG_LOG("WEB_HEADER_BUILT", html.length());
 
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.sendHeader("Cache-Control", "no-store");
@@ -619,6 +635,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     html.remove(0);
     yield();
     WEB_PERF_LOG(requestId, requestStart, phase, chunkBytes, chunkMs);
+    MEMORY_DEBUG_LOG(phase, chunkBytes);
     return server.client().connected();
   };
   if (!flushHtml("COMMON_SENT")) return;
@@ -662,14 +679,16 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<option value='1'" + String(isSeq ? " selected" : "") + ">" + String(tr("Sequence", "シーケンス")) + "</option></select></div></div>";
       html += clickMessagesHtml(idx,"k",isSeq,devices[i].pressMessages,devices[i].pressMessageCount,devices[i].releaseMessages,devices[i].releaseMessageCount);
       html += "<div id='ksq_" + idx + "' class='sequence-card' style='display:" + String(isSeq ? "block" : "none") + "'><h3>" + String(tr("Advance the value on each press", "押すたびに値を進める")) + "</h3><p class='note'>" + String(tr("Move from Start by Step and return to Start after End.", "開始値から増減量ずつ進み、終了値を超えると開始値へ戻ります。")) + "</p><div class='seq-grid'>";
-      html += "<div class='seq-address'><label>" + String(tr("OSC Address", "OSCアドレス")) + "</label><input maxlength='192' name='sa_" + idx + "' value='" + htmlEscape(devices[i].seq.address) + "' oninput='limitBytes(this,192)'></div>";
+      html += addressInputHtml(tr("OSC Address", "OSCアドレス"), "sa_" + idx,
+                               devices[i].seq.address, "seq-address");
       html += "<div><label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='ss_" + idx + "' value='" + String(devices[i].seq.start) + "'></div>";
       html += "<div><label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='se_" + idx + "' value='" + String(devices[i].seq.end) + "'></div>";
       html += "<div><label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='sp_" + idx + "' value='" + String(devices[i].seq.step) + "'></div>";
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
       html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong>";
-      html += "<label>" + String(tr("Rotation Address", "回転OSCアドレス")) + "</label><input name='er_" + idx + "' value='" + htmlEscape(devices[i].enc.rotAddr) + "'>";
+      html += addressInputHtml(tr("Rotation Address", "回転OSCアドレス"),
+                               "er_" + idx, devices[i].enc.rotAddr);
       html += "<label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
       html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select>";
       const String absoluteStyle = devices[i].enc.sendIncrement ? " style='display:none'" : "";
@@ -683,14 +702,16 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
       html += "<div id='esq_" + idx + "' class='click-sequence' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
-      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='ek_" + idx + "' value='" + htmlEscape(devices[i].enc.clickSeq.address) + "'>";
+      html += addressInputHtml(tr("Address", "OSCアドレス"), "ek_" + idx,
+                               devices[i].enc.clickSeq.address);
       html += "<label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='en_" + idx + "' value='" + String(devices[i].enc.clickSeq.start) + "'>";
       html += "<label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='e2_" + idx + "' value='" + String(devices[i].enc.clickSeq.end) + "'>";
       html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='e3_" + idx + "' value='" + String(devices[i].enc.clickSeq.step) + "'>";
       html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong>";
-      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='aa_" + idx + "' value='" + htmlEscape(devices[i].angle.addr) + "'>";
+      html += addressInputHtml(tr("Address", "OSCアドレス"), "aa_" + idx,
+                               devices[i].angle.addr);
       html += "<label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
       html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select>";
       html += "<label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'>";
@@ -699,10 +720,12 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div>";
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
       html += "<div class='joy'><strong>" + String(tr("Joystick XY", "ジョイスティック XY")) + "</strong>";
-      html += "<label>" + String(tr("X Address", "X軸OSCアドレス")) + "</label><input name='jx_" + idx + "' value='" + htmlEscape(devices[i].joy.xAddr) + "'>";
+      html += addressInputHtml(tr("X Address", "X軸OSCアドレス"), "jx_" + idx,
+                               devices[i].joy.xAddr);
       html += "<div class='chk'><input type='checkbox' name='jix_" + idx + "' value='1'" + String(devices[i].joy.invertX ? " checked" : "") + ">";
       html += "<span>" + String(tr("Invert X (+/-)", "X軸反転 (+/-)")) + "</span></div>";
-      html += "<label>" + String(tr("Y Address", "Y軸OSCアドレス")) + "</label><input name='jy_" + idx + "' value='" + htmlEscape(devices[i].joy.yAddr) + "'>";
+      html += addressInputHtml(tr("Y Address", "Y軸OSCアドレス"), "jy_" + idx,
+                               devices[i].joy.yAddr);
       html += "<div class='chk'><input type='checkbox' name='jiy_" + idx + "' value='1'" + String(devices[i].joy.invertY ? " checked" : "") + ">";
       html += "<span>" + String(tr("Invert Y (+/-)", "Y軸反転 (+/-)")) + "</span></div>";
       html += "<label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='jd_" + idx + "' value='" + String(devices[i].joy.deadband) + "'>";
@@ -713,14 +736,16 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += clickModeHtml("jm_" + idx, devices[i].joy.clickMode, "jpr_" + idx, "jsq_" + idx);
       html += clickMessagesHtml(idx,"j",joySeq,devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount);
       html += "<div id='jsq_" + idx + "' class='click-sequence' style='display:" + String(joySeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
-      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='jk_" + idx + "' value='" + htmlEscape(devices[i].joy.clickSeq.address) + "'>";
+      html += addressInputHtml(tr("Address", "OSCアドレス"), "jk_" + idx,
+                               devices[i].joy.clickSeq.address);
       html += "<label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='jn_" + idx + "' value='" + String(devices[i].joy.clickSeq.start) + "'>";
       html += "<label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='j2_" + idx + "' value='" + String(devices[i].joy.clickSeq.end) + "'>";
       html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
       html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
       html += "<div class='ang'><strong>" + String(tr("ToF Distance (mm)", "ToF距離 (mm)")) + "</strong>";
-      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='fa_" + idx + "' value='" + htmlEscape(devices[i].tof.addr) + "'>";
+      html += addressInputHtml(tr("Address", "OSCアドレス"), "fa_" + idx,
+                               devices[i].tof.addr);
       html += "<label>" + String(tr("Deadband (mm)", "不感帯 (mm)")) + "</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
       html += "<label>" + String(tr("Maximum Distance (mm)", "最大距離 (mm)")) + "</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'>";
       html += "<label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
@@ -766,6 +791,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     server.sendContent("");
     WEB_PERF_LOG(requestId, requestStart, "END", 0,
                  millis() - finalStarted);
+    MEMORY_DEBUG_LOG("WEB_ROOT_END", 0);
   } else {
     WEB_PERF_LOG(requestId, requestStart, "ABORT_END", 0, 0);
   }
@@ -775,6 +801,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
 // Save form
 // ---------------------------------------------------------------------------
 void handleSave() {
+  MEMORY_DEBUG_LOG("SAVE_BEGIN", 0);
 #if M5CHAINOSC_STORAGE_DEBUG
   Serial.printf("[M5OSC][WEB] SAVE request args=%d devices=%d\n", server.args(), deviceCount);
 #endif
@@ -846,46 +873,82 @@ void handleSave() {
       }
       devices[i] = candidate;
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
-      if (server.hasArg("er_" + idx)) devices[i].enc.rotAddr = server.arg("er_" + idx);
-      if (server.hasArg("ei_" + idx)) devices[i].enc.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
-      if (server.hasArg("e0_" + idx)) devices[i].enc.absInMin = server.arg("e0_" + idx).toFloat();
-      if (server.hasArg("e1_" + idx)) devices[i].enc.absInMax = server.arg("e1_" + idx).toFloat();
-      if (server.hasArg("es_" + idx)) devices[i].enc.incScale = server.arg("es_" + idx).toFloat();
-      if (server.hasArg("eo_" + idx)) devices[i].enc.map.outMin = server.arg("eo_" + idx).toFloat();
-      if (server.hasArg("eO_" + idx)) devices[i].enc.map.outMax = server.arg("eO_" + idx).toFloat();
-      if (server.hasArg("et_" + idx)) devices[i].enc.map.outType = (ValueType)server.arg("et_" + idx).toInt();
-      if (server.hasArg("em_" + idx)) devices[i].enc.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
-      {String err;if(!parseMessageList(idx,"e",devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount,err)){server.send(400,"text/plain; charset=utf-8",err);return;}if(devices[i].enc.pressMessageCount)devices[i].enc.press=devices[i].enc.pressMessages[0];if(devices[i].enc.releaseMessageCount)devices[i].enc.release=devices[i].enc.releaseMessages[0];}
-      if (server.hasArg("ek_" + idx)) devices[i].enc.clickSeq.address = server.arg("ek_" + idx);
-      if (server.hasArg("en_" + idx)) devices[i].enc.clickSeq.start = server.arg("en_" + idx).toFloat();
-      if (server.hasArg("e2_" + idx)) devices[i].enc.clickSeq.end = server.arg("e2_" + idx).toFloat();
-      if (server.hasArg("e3_" + idx)) devices[i].enc.clickSeq.step = server.arg("e3_" + idx).toFloat();
-      if (server.hasArg("el_" + idx)) devices[i].enc.clickSeq.valueType = (ValueType)server.arg("el_" + idx).toInt();
-      normalizeSequence(devices[i].enc.clickSeq);
+      EncoderOscConfig candidate = devices[i].enc;
+      if (server.hasArg("er_" + idx)) candidate.rotAddr = server.arg("er_" + idx);
+      candidate.rotAddr.trim();
+      String validationError;
+      if (!validOscAddressText(candidate.rotAddr, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Rotation Address: ", "エンコーダー回転OSCアドレス: ")) + validationError); return;
+      }
+      if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
+      if (server.hasArg("e0_" + idx)) candidate.absInMin = server.arg("e0_" + idx).toFloat();
+      if (server.hasArg("e1_" + idx)) candidate.absInMax = server.arg("e1_" + idx).toFloat();
+      if (server.hasArg("es_" + idx)) candidate.incScale = server.arg("es_" + idx).toFloat();
+      if (server.hasArg("eo_" + idx)) candidate.map.outMin = server.arg("eo_" + idx).toFloat();
+      if (server.hasArg("eO_" + idx)) candidate.map.outMax = server.arg("eO_" + idx).toFloat();
+      if (server.hasArg("et_" + idx)) candidate.map.outType = (ValueType)server.arg("et_" + idx).toInt();
+      if (server.hasArg("em_" + idx)) candidate.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
+      if (!parseMessageList(idx,"e",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
+      if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
+      if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
+      if (server.hasArg("ek_" + idx)) candidate.clickSeq.address = server.arg("ek_" + idx);
+      candidate.clickSeq.address.trim();
+      if (!validOscAddressText(candidate.clickSeq.address, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Click Sequence Address: ", "エンコーダークリックシーケンスOSCアドレス: ")) + validationError); return;
+      }
+      if (server.hasArg("en_" + idx)) candidate.clickSeq.start = server.arg("en_" + idx).toFloat();
+      if (server.hasArg("e2_" + idx)) candidate.clickSeq.end = server.arg("e2_" + idx).toFloat();
+      if (server.hasArg("e3_" + idx)) candidate.clickSeq.step = server.arg("e3_" + idx).toFloat();
+      if (server.hasArg("el_" + idx)) candidate.clickSeq.valueType = (ValueType)server.arg("el_" + idx).toInt();
+      normalizeSequence(candidate.clickSeq);
+      devices[i].enc = candidate;
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
-      if (server.hasArg("aa_" + idx)) devices[i].angle.addr = server.arg("aa_" + idx);
-      if (server.hasArg("a1_" + idx)) devices[i].angle.use12bit = server.arg("a1_" + idx).toInt() != 0;
-      if (server.hasArg("ad_" + idx)) devices[i].angle.deadband = server.arg("ad_" + idx).toInt();
-      if (server.hasArg("ao_" + idx)) devices[i].angle.map.outMin = server.arg("ao_" + idx).toFloat();
-      if (server.hasArg("aO_" + idx)) devices[i].angle.map.outMax = server.arg("aO_" + idx).toFloat();
-      if (server.hasArg("at_" + idx)) devices[i].angle.map.outType = (ValueType)server.arg("at_" + idx).toInt();
+      AngleOscConfig candidate = devices[i].angle;
+      if (server.hasArg("aa_" + idx)) candidate.addr = server.arg("aa_" + idx);
+      candidate.addr.trim();
+      String validationError;
+      if (!validOscAddressText(candidate.addr, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Angle Address: ", "Angle OSCアドレス: ")) + validationError); return;
+      }
+      if (server.hasArg("a1_" + idx)) candidate.use12bit = server.arg("a1_" + idx).toInt() != 0;
+      if (server.hasArg("ad_" + idx)) candidate.deadband = server.arg("ad_" + idx).toInt();
+      if (server.hasArg("ao_" + idx)) candidate.map.outMin = server.arg("ao_" + idx).toFloat();
+      if (server.hasArg("aO_" + idx)) candidate.map.outMax = server.arg("aO_" + idx).toFloat();
+      if (server.hasArg("at_" + idx)) candidate.map.outType = (ValueType)server.arg("at_" + idx).toInt();
+      devices[i].angle = candidate;
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
-      if (server.hasArg("jx_" + idx)) devices[i].joy.xAddr = server.arg("jx_" + idx);
-      if (server.hasArg("jy_" + idx)) devices[i].joy.yAddr = server.arg("jy_" + idx);
-      if (server.hasArg("jd_" + idx)) devices[i].joy.deadband = server.arg("jd_" + idx).toInt();
-      devices[i].joy.invertX = server.hasArg("jix_" + idx);
-      devices[i].joy.invertY = server.hasArg("jiy_" + idx);
-      if (server.hasArg("jo_" + idx)) devices[i].joy.map.outMin = server.arg("jo_" + idx).toFloat();
-      if (server.hasArg("jO_" + idx)) devices[i].joy.map.outMax = server.arg("jO_" + idx).toFloat();
-      if (server.hasArg("jt_" + idx)) devices[i].joy.map.outType = (ValueType)server.arg("jt_" + idx).toInt();
-      if (server.hasArg("jm_" + idx)) devices[i].joy.clickMode = (KeyMode)server.arg("jm_" + idx).toInt();
-      {String err;if(!parseMessageList(idx,"j",devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount,err)){server.send(400,"text/plain; charset=utf-8",err);return;}if(devices[i].joy.pressMessageCount)devices[i].joy.press=devices[i].joy.pressMessages[0];if(devices[i].joy.releaseMessageCount)devices[i].joy.release=devices[i].joy.releaseMessages[0];}
-      if (server.hasArg("jk_" + idx)) devices[i].joy.clickSeq.address = server.arg("jk_" + idx);
-      if (server.hasArg("jn_" + idx)) devices[i].joy.clickSeq.start = server.arg("jn_" + idx).toFloat();
-      if (server.hasArg("j2_" + idx)) devices[i].joy.clickSeq.end = server.arg("j2_" + idx).toFloat();
-      if (server.hasArg("j3_" + idx)) devices[i].joy.clickSeq.step = server.arg("j3_" + idx).toFloat();
-      if (server.hasArg("jl_" + idx)) devices[i].joy.clickSeq.valueType = (ValueType)server.arg("jl_" + idx).toInt();
-      normalizeSequence(devices[i].joy.clickSeq);
+      JoystickOscConfig candidate = devices[i].joy;
+      if (server.hasArg("jx_" + idx)) candidate.xAddr = server.arg("jx_" + idx);
+      if (server.hasArg("jy_" + idx)) candidate.yAddr = server.arg("jy_" + idx);
+      candidate.xAddr.trim(); candidate.yAddr.trim();
+      String validationError;
+      if (!validOscAddressText(candidate.xAddr, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Joystick X Address: ", "Joystick X軸OSCアドレス: ")) + validationError); return;
+      }
+      if (!validOscAddressText(candidate.yAddr, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Joystick Y Address: ", "Joystick Y軸OSCアドレス: ")) + validationError); return;
+      }
+      if (server.hasArg("jd_" + idx)) candidate.deadband = server.arg("jd_" + idx).toInt();
+      candidate.invertX = server.hasArg("jix_" + idx);
+      candidate.invertY = server.hasArg("jiy_" + idx);
+      if (server.hasArg("jo_" + idx)) candidate.map.outMin = server.arg("jo_" + idx).toFloat();
+      if (server.hasArg("jO_" + idx)) candidate.map.outMax = server.arg("jO_" + idx).toFloat();
+      if (server.hasArg("jt_" + idx)) candidate.map.outType = (ValueType)server.arg("jt_" + idx).toInt();
+      if (server.hasArg("jm_" + idx)) candidate.clickMode = (KeyMode)server.arg("jm_" + idx).toInt();
+      if (!parseMessageList(idx,"j",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
+      if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
+      if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
+      if (server.hasArg("jk_" + idx)) candidate.clickSeq.address = server.arg("jk_" + idx);
+      candidate.clickSeq.address.trim();
+      if (!validOscAddressText(candidate.clickSeq.address, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Joystick Click Sequence Address: ", "JoystickクリックシーケンスOSCアドレス: ")) + validationError); return;
+      }
+      if (server.hasArg("jn_" + idx)) candidate.clickSeq.start = server.arg("jn_" + idx).toFloat();
+      if (server.hasArg("j2_" + idx)) candidate.clickSeq.end = server.arg("j2_" + idx).toFloat();
+      if (server.hasArg("j3_" + idx)) candidate.clickSeq.step = server.arg("j3_" + idx).toFloat();
+      if (server.hasArg("jl_" + idx)) candidate.clickSeq.valueType = (ValueType)server.arg("jl_" + idx).toInt();
+      normalizeSequence(candidate.clickSeq);
+      devices[i].joy = candidate;
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
       TofOscConfig candidate = devices[i].tof;
       if (server.hasArg("fa_" + idx)) candidate.addr = server.arg("fa_" + idx);
@@ -923,6 +986,7 @@ void handleSave() {
     }
   }
   sendUiResult(200, tr("Saved!", "保存しました！"), tr("All settings were saved.", "すべての設定を保存しました。"));
+  MEMORY_DEBUG_LOG("SAVE_END", 0);
 }
 
 void handleSetRotation() {
@@ -1004,6 +1068,7 @@ void handleImportDevicePreset() {
   }
 
   String body = server.arg("plain");
+  MEMORY_DEBUG_LOG("PRESET_BODY_RECEIVED", body.length());
   if (!body.length()) {
     server.send(400, "text/plain; charset=utf-8", tr("Preset file is empty.", "プリセットファイルが空です。"));
     return;
@@ -1014,8 +1079,11 @@ void handleImportDevicePreset() {
   }
 
   DynamicJsonDocument document(24576);
+  MEMORY_DEBUG_JSON("PRESET_DOCUMENT_CREATED", body.length(), document);
   DeserializationError parseError = deserializeJson(document, body);
+  MEMORY_DEBUG_JSON("PRESET_JSON_PARSED", body.length(), document);
   body = "";
+  MEMORY_DEBUG_JSON("PRESET_BODY_RELEASED", 0, document);
   if (parseError) {
     server.send(400, "text/plain; charset=utf-8", String(tr("Invalid JSON: ", "JSONが正しくありません: ")) + parseError.c_str());
     return;
@@ -1044,6 +1112,7 @@ void handleImportDevicePreset() {
   root["displayName"] = devices[index].displayName;
 
   ChainDevice* candidate = new (std::nothrow) ChainDevice();
+  MEMORY_DEBUG_JSON("PRESET_CANDIDATE_CREATED", 0, document);
   if (!candidate) {
     server.send(503, "text/plain; charset=utf-8", tr("Not enough memory to validate the preset.", "プリセットを検証するためのメモリが不足しています。"));
     return;
@@ -1063,11 +1132,13 @@ void handleImportDevicePreset() {
   delete candidate;
 
   loadDeviceSettings(devices[index]);
+  MEMORY_DEBUG_JSON("PRESET_END", 0, document);
   server.send(200, "text/plain; charset=utf-8",
               String(tr("Preset imported for ", "プリセットをインポートしました: ")) + String(typeToName(devices[index].type)) + ".");
 }
 
 void handleExportSettings() {
+  MEMORY_DEBUG_LOG("EXPORT_BEGIN", 0);
   server.sendHeader("Content-Disposition", "attachment; filename=\"M5ChainOSC-settings-v" + String(SETTINGS_SCHEMA_VERSION) + ".json\"");
   server.sendHeader("Cache-Control", "no-store");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -1093,20 +1164,26 @@ void handleExportSettings() {
     String chunk = first ? "" : ",";
     chunk += deviceJson(saved);
     server.sendContent(chunk);
+    MEMORY_DEBUG_LOG("EXPORT_DEVICE_SENT", chunk.length());
     first = false;
   }
   server.sendContent("]}");
   server.sendContent("");
+  MEMORY_DEBUG_LOG("EXPORT_END", 0);
 }
 
 void handleImportSettings() {
   String body = server.arg("plain");
+  MEMORY_DEBUG_LOG("IMPORT_BODY_RECEIVED", body.length());
   if (!body.length()) { server.send(400, "text/plain; charset=utf-8", tr("Import file is empty.", "インポートファイルが空です。")); return; }
   if (body.length() > 49152) { server.send(413, "text/plain; charset=utf-8", tr("Import file exceeds 48 KiB.", "インポートファイルが48 KiBを超えています。")); return; }
 
   DynamicJsonDocument document(65536);
+  MEMORY_DEBUG_JSON("IMPORT_DOCUMENT_CREATED", body.length(), document);
   DeserializationError parseError = deserializeJson(document, body);
+  MEMORY_DEBUG_JSON("IMPORT_JSON_PARSED", body.length(), document);
   body = "";
+  MEMORY_DEBUG_JSON("IMPORT_BODY_RELEASED", 0, document);
   if (parseError) {
     server.send(400, "text/plain; charset=utf-8", String(tr("Invalid JSON: ", "JSONが正しくありません: ")) + parseError.c_str()); return;
   }
@@ -1143,6 +1220,7 @@ void handleImportSettings() {
   }
 
   ChainDevice* candidate = new (std::nothrow) ChainDevice();
+  MEMORY_DEBUG_JSON("IMPORT_CANDIDATE_CREATED", 0, document);
   if (!candidate) { server.send(503, "text/plain; charset=utf-8", tr("Not enough memory to validate settings.", "設定を検証するためのメモリが不足しています。")); return; }
   String validationError;
   int deviceNumber = 0;
@@ -1170,8 +1248,10 @@ void handleImportSettings() {
       delete candidate;
       server.send(507, "text/plain; charset=utf-8", String(tr("Storage write failed at device ", "デバイス設定のストレージ書き込みに失敗しました: ")) + String(deviceNumber) + "."); return;
     }
+    MEMORY_DEBUG_JSON("IMPORT_DEVICE_SAVED", 0, document);
   }
   delete candidate;
+  MEMORY_DEBUG_JSON("IMPORT_CANDIDATE_RELEASED", 0, document);
 
   osc_host = importedHost;
   osc_port = importedPort;
@@ -1183,5 +1263,6 @@ void handleImportSettings() {
   applyDisplayRotation();
   refreshChainDevices(true);
   if (!isAPMode && !resetInProgress) drawMainScreen();
+  MEMORY_DEBUG_JSON("IMPORT_END", 0, document);
   server.send(200, "text/plain; charset=utf-8", String(tr("Import completed. ", "インポートが完了しました。")) + String(importedDevices.size()) + tr(" device(s) restored.", "件のデバイス設定を復元しました。"));
 }

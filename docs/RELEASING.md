@@ -10,13 +10,18 @@ GitHubリポジトリで`Settings` → `Actions` → `General`を開き、Action
 
 Personal Access Tokenの追加は不要です。GitHub Actionsが発行する`GITHUB_TOKEN`を使用します。
 
+GitHubリポジトリの`Settings` → `Pages` → `Build and deployment`を開き、`Source`を`GitHub Actions`へ変更します。Pages配信ジョブは`pages: write`と`id-token: write`を使用します。
+
 ## タグを作る前の準備
 
-例えば次の正式版を`1.6.0`とする場合、ファームウェアを公開する最初のコミットでは次を更新します。
+例えば次の正式版を`1.6.0`とする場合、タグを作る前のコミットで次を更新します。
 
 - `src/config.h`の`APP_VERSION`
+- `docs/installer/manifest.json`のバージョンとファームウェアパス
+- `docs/installer/index.html`のStable versionと更新履歴
+- `docs/installer/README.md`の正式版表記と更新履歴
 
-Web InstallerにはRelease Assetと同一のバイナリを配置するため、Release公開後に別のコミットで更新します。
+mergedバイナリを`docs/installer/firmware/`へ手作業で配置する必要はありません。Release公開後、Pages配信WorkflowがRelease Assetから自動取得します。
 
 ## タグを付ける前のActionsテスト
 
@@ -66,16 +71,18 @@ GitHubのドラフトReleaseで次を確認します。
 - Release notesに不足や誤りがない
 - Web Installer用ファームウェアを実機で検証済み
 
-問題がなければ`Publish release`を押します。
+問題がなければ`Publish release`を押します。Releaseの公開を検知すると、`Deploy GitHub Pages` Workflowが次を自動実行します。
 
-## Web Installerを更新する
+1. 公開されたReleaseから対応するmergedバイナリをダウンロード
+2. `manifest.json`、バージョン表記、ファームウェアファイルの整合性を確認
+3. JekyllでドキュメントとWeb Installerをビルド
+4. GitHub Pagesへ配信
 
-Release公開後、次を新しいバージョンへ更新します。
+配信完了後、Actionsの`Deploy GitHub Pages`と公開中のWeb Installerを確認してください。
 
-- `docs/installer/manifest.json`の`version`とファームウェアパス
-- `docs/installer/index.html`のStable versionと更新履歴
-- `docs/installer/README.md`の正式版表記と更新履歴
-- `docs/installer/firmware/`へRelease Assetと同一のmergedバイナリを配置
+## ドキュメントだけを更新する
+
+`docs/`以下だけを`main`へpushした場合もPages配信Workflowが実行されます。`manifest.json`に対応する公開済みRelease Assetを取得し直すため、ファームウェアをリポジトリへコミットする必要はありません。
 
 manifestのファームウェアパスは、次の形式にします。
 
@@ -83,19 +90,21 @@ manifestのファームウェアパスは、次の形式にします。
 firmware/M5ChainOSC-1.6.0-AtomS3R-merged.bin
 ```
 
-GitHub Releaseからダウンロードしたバイナリを使用し、Releaseに添付されたSHA-256と一致することを確認してください。同一オリジンで配信することで、ブラウザのCORS制限による取得失敗を防ぎます。
-
-Installerの整合性を確認します。
+ローカルに対応するファームウェアを配置した場合は、Installerの完全な整合性を確認できます。
 
 ```powershell
 python scripts/check_release_version.py --check-installer
 ```
 
-確認後にInstaller関連の変更をコミットして`main`へpushし、公開ページから実機へ書き込めることを確認します。
+ファームウェアを配置しない状態でメタデータだけを確認する場合は、次を実行します。
+
+```powershell
+python scripts/check_release_version.py --check-installer-metadata
+```
 
 ## バージョン不一致時
 
-タグと`APP_VERSION`が一致しない場合、ワークフローはReleaseを作成せずエラー終了します。Web Installerの整合性は`--check-installer`を指定して別途確認します。
+タグ、`APP_VERSION`、Web Installerのバージョン表記が一致しない場合、ワークフローはReleaseを作成せずエラー終了します。
 
 タグをまだGitHubへpushしていない場合は、ローカルタグを削除して修正できます。
 

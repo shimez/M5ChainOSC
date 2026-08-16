@@ -63,6 +63,7 @@
 #include "chain_devices.h"
 #include "wifi_manager.h"
 #include "web_ui.h"
+#include "memory_debug.h"
 
 void appSetup() {
   auto cfg = M5.config();
@@ -70,16 +71,21 @@ void appSetup() {
   M5.begin(cfg);
   Serial.begin(115200);
   delay(200);
+  MEMORY_DEBUG_LOG("SETUP_M5_READY", 0);
 
   loadWifiAndOscCommon();
+  MEMORY_DEBUG_LOG("SETUP_SETTINGS_LOADED", 0);
   applyDisplayRotation();
   showMessage("START");
 
   connectOrStartAP();
+  MEMORY_DEBUG_LOG("SETUP_WIFI_READY", 0);
   initChainBus();
+  MEMORY_DEBUG_LOG("SETUP_CHAIN_READY", 0);
 
   if (!isAPMode) drawMainScreen();
   lastReenumMs = millis();
+  MEMORY_DEBUG_LOG("SETUP_END", 0);
 }
 
 void appLoop() {

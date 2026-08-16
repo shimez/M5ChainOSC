@@ -35,7 +35,12 @@ def main() -> None:
     parser.add_argument(
         "--check-installer",
         action="store_true",
-        help="Also validate Web Installer version references.",
+        help="Validate Web Installer metadata and the local firmware file.",
+    )
+    parser.add_argument(
+        "--check-installer-metadata",
+        action="store_true",
+        help="Validate Web Installer version references without requiring firmware.",
     )
     args = parser.parse_args()
 
@@ -59,7 +64,7 @@ def main() -> None:
     firmware_name = f"M5ChainOSC-{config_version}-AtomS3R-merged.bin"
     checksum_name = f"M5ChainOSC-{config_version}-AtomS3R-SHA256.txt"
 
-    if args.check_installer:
+    if args.check_installer or args.check_installer_metadata:
         manifest = json.loads(read_text("docs/installer/manifest.json"))
         manifest_version = str(manifest.get("version", ""))
         if manifest_version != config_version:
@@ -82,7 +87,9 @@ def main() -> None:
                 f"{expected_manifest_path} at offset 0."
             )
 
-        if not (ROOT / "docs" / "installer" / expected_manifest_path).is_file():
+        if args.check_installer and not (
+            ROOT / "docs" / "installer" / expected_manifest_path
+        ).is_file():
             raise SystemExit(
                 "Web Installer firmware file does not exist: "
                 f"docs/installer/{expected_manifest_path}"
