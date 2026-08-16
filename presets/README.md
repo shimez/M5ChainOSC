@@ -7,6 +7,8 @@ M5ChainOSCで利用できる、Chainデバイス単体の設定サンプルで�
 
 各プリセットはUIDとDevice Nameを含まないため、同じ種類の別のChainデバイスへインポートして利用できます。
 
+初めてM5ChainOSCを使用する場合は、[プリセット・クイックスタート](https://shimez.github.io/M5ChainOSC/quick-start-presets/)を参照してください。
+
 ## 使い方
 
 1. 下の一覧から使用するJSONファイルを開きます。
@@ -34,6 +36,10 @@ VRChat内の移動をJoystickで行うサンプルです。
 
 ### Key
 
+#### [VRChat AFK Control](key/vrchat-afk-control.json)
+
+VRChatのAFKモードをON／OFFするサンプルです。
+
 #### [VRChat Voice Control](key/vrchat-voice-control.json)
 
 VRChat内でマイクのON／OFFを操作するサンプルです。
@@ -47,6 +53,18 @@ VRChat内のカメラを配信向けに切り替えるサンプルです。
 - Smooth設定
 
 これらの設定をまとめて変更します。
+
+### Angle
+
+#### [VRChat Camera Zoom](angle/vrchat-camerazoom.json)
+
+VRChat内のカメラのズームをAngleで調整するサンプルです。
+
+### Encoder
+
+#### [VRChat Camera Zoom](encoder/vrchat-camerazoom.json)
+
+VRChat内のカメラのズームをEncoderで調整するサンプルです。
 
 ## 注意事項
 

@@ -1,0 +1,1 @@
+{"format":"M5ChainOSC-device-preset","schemaVersion":1,"deviceType":3,"deviceTypeName":"Key","key":{"mode":0,"press":[{"address":"/input/AFKToggle","value":"1","type":1}],"release":[{"address":"/input/AFKToggle","value":"0","type":1}],"sequence":{"address":"/avatar/parameters/KeySeq","type":0,"start":0.000000,"end":10.000000,"step":1.000000}}}

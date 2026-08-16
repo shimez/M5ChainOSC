@@ -16,6 +16,8 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 > [!NOTE]
 > Chain ToFを含む対応デバイスは実機での動作確認を行っています。
 
+バージョンごとの変更内容は[CHANGELOG.md](CHANGELOG.md)を参照してください。
+
 ## 主な機能
 
 - 英語／日本語を切り替えられるWeb UIによる設定
@@ -128,6 +130,8 @@ Web UIの`Export Settings (JSON)`から保存済み設定をダウンロード�
 
 すぐに利用できるVRChat向けサンプルは、[Device Presets](presets/README.md)で公開しています。
 
+ファームウェアの書き込みからプリセットを使ったVRChatでの動作確認までは、[プリセット・クイックスタート](https://shimez.github.io/M5ChainOSC/quick-start-presets/)を参照してください。
+
 - JoystickによるVRChat内の移動とジャンプ
 - KeyによるマイクのON／OFF
 - Keyによる配信向けカメラ設定の切り替え
@@ -152,10 +156,14 @@ src/
   wifi_manager.*        Wi-Fi STA／AP処理
   osc_send.*            OSC送信
 docs/
+  QUICK_START_PRESETS_ja.md
+                        プリセットを使ったクイックスタート
   USER_GUIDE_ja.md      日本語ユーザーガイド
   installer/            正式版Web Installer
 presets/
   README.md              デバイスプリセット一覧と使用方法
+  angle/                 Angle用プリセット
+  encoder/               Encoder用プリセット
   joystick/              Joystick用プリセット
   key/                   Key用プリセット
 licenses/

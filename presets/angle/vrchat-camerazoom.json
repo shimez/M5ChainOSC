@@ -1,0 +1,1 @@
+{"format":"M5ChainOSC-device-preset","schemaVersion":1,"deviceType":2,"deviceTypeName":"Angle","angle":{"address":"/usercamera/Zoom","use12bit":true,"deadband":8,"range":{"outMin":20.000000,"outMax":300.000000,"type":0}}}
