@@ -23,10 +23,10 @@ jobs:
       checksum_name: ${{ steps.version.outputs.checksum_name }}
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -79,7 +79,7 @@ jobs:
           cat "dist/$CHECKSUM_NAME"
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: M5ChainOSC-${{ steps.version.outputs.version }}-AtomS3R
           path: dist/*
@@ -88,7 +88,7 @@ jobs:
 
       - name: Upload release files for draft job
         if: github.ref_type == 'tag'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-files
           path: dist/*
@@ -104,7 +104,7 @@ jobs:
       contents: write
     steps:
       - name: Download release files
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-files
           path: dist
