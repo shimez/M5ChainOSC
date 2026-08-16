@@ -97,8 +97,8 @@ static String numericTypeSelectHtml(const String& name, ValueType cur) {
 static String clickModeHtml(const String& name, KeyMode cur, const String& prId, const String& sqId) {
   String s = "<div class='mode-box'><label>" + String(tr("Click Mode", "クリックモード")) + "</label>";
   s += "<select name='" + name + "' onchange=\"toggleClickMode('" + prId + "','" + sqId + "',this)\">";
-  s += "<option value='0'" + String(cur == MODE_PRESS_RELEASE ? " selected" : "") + ">Press / Release</option>";
-  s += "<option value='1'" + String(cur == MODE_SEQUENCE ? " selected" : "") + ">Sequence (press only)</option>";
+  s += "<option value='0'" + String(cur == MODE_PRESS_RELEASE ? " selected" : "") + ">" + String(tr("Press / Release", "押した時／離した時")) + "</option>";
+  s += "<option value='1'" + String(cur == MODE_SEQUENCE ? " selected" : "") + ">" + String(tr("Sequence (press only)", "シーケンス（押した時のみ）")) + "</option>";
   s += "</select></div>";
   return s;
 }
@@ -108,7 +108,7 @@ static String messageRowHtml(const String& group, const String& prefix, const ch
   String p = prefix + (String(eventName) == "press" ? "p" : "r");
   String row = "<div class='osc-row' data-group='" + group + "' data-prefix='" + prefix + "' data-event='" + eventName + "'>";
   row += "<div class='order'><button type='button' class='mv' onclick='moveMsg(this,-1)'>&uarr;</button><button type='button' class='mv' onclick='moveMsg(this,1)'>&darr;</button></div>";
-  row += "<div class='field'><label>OSC Address</label><input class='msg-address' maxlength='192' name='" + p + "a_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.address) + "' oninput='limitAndValidate(this,192)'><small><span class='err'></span><span class='bytes'></span></small></div>";
+  row += "<div class='field'><label>" + String(tr("OSC Address", "OSCアドレス")) + "</label><input class='msg-address' maxlength='192' name='" + p + "a_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.address) + "' oninput='limitAndValidate(this,192)'><small><span class='err'></span><span class='bytes'></span></small></div>";
   row += "<div class='field'><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml(p + "t_" + idx + "_" + String(order), m.valueType) + "<small></small></div>";
   row += "<div class='field'><label>" + String(tr("Value", "値")) + "</label><input class='msg-value' maxlength='128' name='" + p + "v_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.valueStr) + "' oninput='limitAndValidate(this,128)'><small><span class='err'></span><span class='bytes'></span></small></div>";
   row += "<button type='button' class='remove-msg' onclick='removeMsg(this)'>" + String(tr("Delete", "削除")) + "</button></div>";
@@ -119,9 +119,9 @@ static String clickMessagesHtml(const String& idx, const String& prefix, bool se
                                 const OSCMessage* press, uint8_t pressCount,
                                 const OSCMessage* release, uint8_t releaseCount) {
   String group=prefix+idx, out="<div id='"+prefix+"pr_"+idx+"' style='display:"+String(sequenceMode?"none":"block")+"'>";
-  out += "<div class='usage'><strong>" + String(tr("Messages", "メッセージ")) + " <span id='count_"+group+"'>"+String(pressCount+releaseCount)+"</span> / 8</strong><span>Press + Release</span></div>";
+  out += "<div class='usage'><strong>" + String(tr("Messages", "メッセージ")) + " <span id='count_"+group+"'>"+String(pressCount+releaseCount)+"</span> / 8</strong><span>" + String(tr("Press + Release", "押した時＋離した時")) + "</span></div>";
   out += "<input type='hidden' id='pc_"+group+"' name='"+prefix+"pc_"+idx+"' value='"+String(pressCount)+"'><input type='hidden' id='rc_"+group+"' name='"+prefix+"rc_"+idx+"' value='"+String(releaseCount)+"'>";
-  out += "<div class='event-tabs'><button type='button' class='event-tab active' onclick=\"showEvent('"+group+"','press',this)\">Press</button><button type='button' class='event-tab' onclick=\"showEvent('"+group+"','release',this)\">Release</button></div>";
+  out += "<div class='event-tabs'><button type='button' class='event-tab active' onclick=\"showEvent('"+group+"','press',this)\">" + String(tr("Press", "押した時")) + "</button><button type='button' class='event-tab' onclick=\"showEvent('"+group+"','release',this)\">" + String(tr("Release", "離した時")) + "</button></div>";
   out += "<div class='event-panel' data-group='"+group+"' data-event='press'><div class='osc-list' id='list_press_"+group+"'>";
   for(uint8_t i=0;i<pressCount;i++) out+=messageRowHtml(group,prefix,"press",i,press[i]);
   out += "</div><div class='empty'>" + String(tr("No OSC message is sent when pressed.", "押したときはOSCメッセージを送信しません。")) + "</div><button type='button' class='add-msg' data-group='"+group+"' data-prefix='"+prefix+"' data-event='press' onclick='addMsg(this)'>" + String(tr("+ Add OSC Message", "+ OSCメッセージを追加")) + "</button></div>";
@@ -432,7 +432,11 @@ void handleAPRoot() {
   applyBrowserLanguageOnFirstVisit();
   String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>WiFi Setup</title></head><body>";
   html += "<form method='POST' action='/set_language'><label>" + String(tr("Language", "言語")) + "</label><select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form>";
-  html += "<h2>" + String(tr("WiFi Setup", "Wi-Fi設定")) + "</h2><form method='POST' action='/save_wifi'>";
+  html += "<h2>" + String(tr("WiFi Setup", "Wi-Fi設定")) + "</h2>";
+  html += "<p role='alert' style='padding:12px;border:1px solid #d99b22;border-radius:8px;background:#fff4d6;color:#5f4300;font-weight:bold;line-height:1.5'>" + String(tr(
+      "AtomS3R supports 2.4 GHz Wi-Fi only and cannot connect to 5 GHz-only networks. Select a 2.4 GHz SSID.",
+      "AtomS3Rが接続できるWi-Fiは2.4 GHz帯のみです。5 GHz帯専用のSSIDには接続できません。2.4 GHz帯に対応するSSIDを選択してください。")) + "</p>";
+  html += "<form method='POST' action='/save_wifi'>";
   html += "SSID<input name='ssid'><br>" + String(tr("Password", "パスワード")) + "<input type='password' name='password'><br>";
   html += "<button type='submit'>" + String(tr("Save & Restart", "保存して再起動")) + "</button></form></body></html>";
   server.send(200, "text/html; charset=utf-8", html);
@@ -526,13 +530,14 @@ const JA=__JA__;const tx=(en,ja)=>JA?ja:en;const MAX_MSG=8;const enc=new TextEnc
 function bytes(v){return enc.encode(v).length}
 function toggleMode(pr,sq,sel){if(!pr||!sq)return;if(sel.value==='1'){pr.style.display='none';sq.style.display='block';}else{pr.style.display='block';sq.style.display='none';}}
 function toggleClickMode(prId,sqId,sel){toggleMode(document.getElementById(prId),document.getElementById(sqId),sel);}
+function updateEncoderMode(sel){let enc=sel.closest('.enc'),showAbsolute=sel.value==='0';if(!enc)return;enc.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.style.display=showAbsolute?'':'none')}
 function showEvent(group,event,btn){document.querySelectorAll('.event-panel[data-group="'+group+'"]').forEach(x=>x.style.display=x.dataset.event===event?'block':'none');btn.parentNode.querySelectorAll('.event-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function allRows(group){return document.querySelectorAll('.osc-row[data-group="'+group+'"]')}
 function renumber(group){let rows=allRows(group),prefix=rows.length?rows[0].dataset.prefix:document.querySelector('.add-msg[data-group="'+group+'"]').dataset.prefix,idx=group.substring(prefix.length);['press','release'].forEach(ev=>{document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="'+ev+'"]').forEach((r,i)=>{let p=prefix+(ev==='press'?'p':'r');r.querySelector('.msg-address').name=p+'a_'+idx+'_'+i;r.querySelector('.type').name=p+'t_'+idx+'_'+i;r.querySelector('.msg-value').name=p+'v_'+idx+'_'+i})});let n=rows.length;document.getElementById('count_'+group).textContent=n;document.getElementById('pc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="press"]').length;document.getElementById('rc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="release"]').length;document.querySelectorAll('.add-msg[data-group="'+group+'"]').forEach(b=>b.disabled=n>=MAX_MSG)}
 function markDirty(){let s=document.getElementById('dirty-status');if(!s)return;window.settingsDirty=true;s.hidden=false}
 function moveMsg(btn,d){let r=btn.closest('.osc-row'),s=d<0?r.previousElementSibling:r.nextElementSibling;if(!s)return;d<0?r.parentNode.insertBefore(r,s):r.parentNode.insertBefore(s,r);renumber(r.dataset.group);markDirty()}
 function removeMsg(btn){let r=btn.closest('.osc-row'),g=r.dataset.group;r.remove();renumber(g);markDirty()}
-function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>OSC Address</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>'+tx('Type','型')+'</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>'+tx('Value','値')+'</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">'+tx('Delete','削除')+'</button>';list.appendChild(r);renumber(g);markDirty();r.querySelector('.msg-address').focus()}
+function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>'+tx('OSC Address','OSCアドレス')+'</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>'+tx('Type','型')+'</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>'+tx('Value','値')+'</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">'+tx('Delete','削除')+'</button>';list.appendChild(r);renumber(g);markDirty();r.querySelector('.msg-address').focus()}
 function limitBytes(i,max){while(bytes(i.value)>max)i.value=i.value.slice(0,-1)}
 function limitAndValidate(i,max){limitBytes(i,max);validateInput(i)}
 function validateInput(i){let max=i.classList.contains('msg-address')?192:128,b=bytes(i.value),err='';if(i.classList.contains('msg-address')){if(!i.value)err=tx('Required','必須です');else if(i.value[0]!='/')err=tx('Start with /','/ から始めてください');else if(/[\s#*,?\[\]{}]/.test(i.value))err=tx('Invalid character','使用できない文字があります')}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err=tx('Invalid float','小数として正しくありません');if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err=tx('Invalid integer','整数として正しくありません')}if(b>max)err=tx('Too long','長すぎます');i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
@@ -653,77 +658,78 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     if (devices[i].type == CHAIN_KEY_TYPE_CODE) {
       html += "<div class='key-grid'><div><label>" + String(tr("Device Name", "デバイス名")) + "</label><input maxlength='64' name='nm_" + idx + "' value='" + htmlEscape(devices[i].displayName) + "' oninput='limitBytes(this,64)'></div>";
       html += "<div><label>" + String(tr("Key Mode", "キーモード")) + "</label><select name='md_" + idx + "' onchange=\"toggleClickMode('kpr_" + idx + "','ksq_" + idx + "',this)\">";
-      html += "<option value='0'" + String(!isSeq ? " selected" : "") + ">Press / Release</option>";
-      html += "<option value='1'" + String(isSeq ? " selected" : "") + ">Sequence</option></select></div></div>";
+      html += "<option value='0'" + String(!isSeq ? " selected" : "") + ">" + String(tr("Press / Release", "押した時／離した時")) + "</option>";
+      html += "<option value='1'" + String(isSeq ? " selected" : "") + ">" + String(tr("Sequence", "シーケンス")) + "</option></select></div></div>";
       html += clickMessagesHtml(idx,"k",isSeq,devices[i].pressMessages,devices[i].pressMessageCount,devices[i].releaseMessages,devices[i].releaseMessageCount);
-      html += "<div id='ksq_" + idx + "' class='sequence-card' style='display:" + String(isSeq ? "block" : "none") + "'><h3>" + String(tr("Advance the value on each press", "押すたびに値を進める")) + "</h3><p class='note'>" + String(tr("Move from Start by Step and return to Start after End.", "StartからStepずつ進み、Endを超えるとStartへ戻ります。")) + "</p><div class='seq-grid'>";
-      html += "<div class='seq-address'><label>OSC Address</label><input maxlength='192' name='sa_" + idx + "' value='" + htmlEscape(devices[i].seq.address) + "' oninput='limitBytes(this,192)'></div>";
-      html += "<div><label>Start</label><input type='number' step='any' name='ss_" + idx + "' value='" + String(devices[i].seq.start) + "'></div>";
-      html += "<div><label>End</label><input type='number' step='any' name='se_" + idx + "' value='" + String(devices[i].seq.end) + "'></div>";
-      html += "<div><label>Step</label><input type='number' step='any' name='sp_" + idx + "' value='" + String(devices[i].seq.step) + "'></div>";
+      html += "<div id='ksq_" + idx + "' class='sequence-card' style='display:" + String(isSeq ? "block" : "none") + "'><h3>" + String(tr("Advance the value on each press", "押すたびに値を進める")) + "</h3><p class='note'>" + String(tr("Move from Start by Step and return to Start after End.", "開始値から増減量ずつ進み、終了値を超えると開始値へ戻ります。")) + "</p><div class='seq-grid'>";
+      html += "<div class='seq-address'><label>" + String(tr("OSC Address", "OSCアドレス")) + "</label><input maxlength='192' name='sa_" + idx + "' value='" + htmlEscape(devices[i].seq.address) + "' oninput='limitBytes(this,192)'></div>";
+      html += "<div><label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='ss_" + idx + "' value='" + String(devices[i].seq.start) + "'></div>";
+      html += "<div><label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='se_" + idx + "' value='" + String(devices[i].seq.end) + "'></div>";
+      html += "<div><label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='sp_" + idx + "' value='" + String(devices[i].seq.step) + "'></div>";
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
       html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong>";
-      html += "<label>Rotation Address</label><input name='er_" + idx + "' value='" + htmlEscape(devices[i].enc.rotAddr) + "'>";
-      html += "<label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
+      html += "<label>" + String(tr("Rotation Address", "回転OSCアドレス")) + "</label><input name='er_" + idx + "' value='" + htmlEscape(devices[i].enc.rotAddr) + "'>";
+      html += "<label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
       html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select>";
-      html += "<label>Abs In Min</label><input type='number' step='any' name='e0_" + idx + "' value='" + String(devices[i].enc.absInMin) + "'>";
-      html += "<label>Abs In Max</label><input type='number' step='any' name='e1_" + idx + "' value='" + String(devices[i].enc.absInMax) + "'>";
-      html += "<label>Inc Scale</label><input type='number' step='any' name='es_" + idx + "' value='" + String(devices[i].enc.incScale) + "'>";
-      html += "<label>Out Min</label><input type='number' step='any' name='eo_" + idx + "' value='" + String(devices[i].enc.map.outMin) + "'>";
-      html += "<label>Out Max</label><input type='number' step='any' name='eO_" + idx + "' value='" + String(devices[i].enc.map.outMax) + "'>";
-      html += "<label>Out Type</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div>";
+      const String absoluteStyle = devices[i].enc.sendIncrement ? " style='display:none'" : "";
+      html += "<label class='encoder-absolute-setting'" + absoluteStyle + ">" + String(tr("Abs In Min", "絶対値入力の最小値")) + "</label><input class='encoder-absolute-setting'" + absoluteStyle + " type='number' step='any' name='e0_" + idx + "' value='" + String(devices[i].enc.absInMin) + "'>";
+      html += "<label class='encoder-absolute-setting'" + absoluteStyle + ">" + String(tr("Abs In Max", "絶対値入力の最大値")) + "</label><input class='encoder-absolute-setting'" + absoluteStyle + " type='number' step='any' name='e1_" + idx + "' value='" + String(devices[i].enc.absInMax) + "'>";
+      html += "<label>" + String(tr("Inc Scale", "増分倍率")) + "</label><input type='number' step='any' name='es_" + idx + "' value='" + String(devices[i].enc.incScale) + "'>";
+      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='eo_" + idx + "' value='" + String(devices[i].enc.map.outMin) + "'>";
+      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='eO_" + idx + "' value='" + String(devices[i].enc.map.outMax) + "'>";
+      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div>";
       html += "<div class='click-section encoder-click'>";
       html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
       html += "<div id='esq_" + idx + "' class='click-sequence' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
-      html += "<label>Address</label><input name='ek_" + idx + "' value='" + htmlEscape(devices[i].enc.clickSeq.address) + "'>";
-      html += "<label>Start</label><input type='number' step='any' name='en_" + idx + "' value='" + String(devices[i].enc.clickSeq.start) + "'>";
-      html += "<label>End</label><input type='number' step='any' name='e2_" + idx + "' value='" + String(devices[i].enc.clickSeq.end) + "'>";
-      html += "<label>Step</label><input type='number' step='any' name='e3_" + idx + "' value='" + String(devices[i].enc.clickSeq.step) + "'>";
+      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='ek_" + idx + "' value='" + htmlEscape(devices[i].enc.clickSeq.address) + "'>";
+      html += "<label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='en_" + idx + "' value='" + String(devices[i].enc.clickSeq.start) + "'>";
+      html += "<label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='e2_" + idx + "' value='" + String(devices[i].enc.clickSeq.end) + "'>";
+      html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='e3_" + idx + "' value='" + String(devices[i].enc.clickSeq.step) + "'>";
       html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
-      html += "<div class='ang'><strong>Angle</strong>";
-      html += "<label>Address</label><input name='aa_" + idx + "' value='" + htmlEscape(devices[i].angle.addr) + "'>";
+      html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong>";
+      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='aa_" + idx + "' value='" + htmlEscape(devices[i].angle.addr) + "'>";
       html += "<label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
       html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select>";
-      html += "<label>Deadband</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'>";
-      html += "<label>Out Min</label><input type='number' step='any' name='ao_" + idx + "' value='" + String(devices[i].angle.map.outMin) + "'>";
-      html += "<label>Out Max</label><input type='number' step='any' name='aO_" + idx + "' value='" + String(devices[i].angle.map.outMax) + "'>";
-      html += "<label>Out Type</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div>";
+      html += "<label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'>";
+      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='ao_" + idx + "' value='" + String(devices[i].angle.map.outMin) + "'>";
+      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='aO_" + idx + "' value='" + String(devices[i].angle.map.outMax) + "'>";
+      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div>";
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
-      html += "<div class='joy'><strong>Joystick XY</strong>";
-      html += "<label>X Address</label><input name='jx_" + idx + "' value='" + htmlEscape(devices[i].joy.xAddr) + "'>";
+      html += "<div class='joy'><strong>" + String(tr("Joystick XY", "ジョイスティック XY")) + "</strong>";
+      html += "<label>" + String(tr("X Address", "X軸OSCアドレス")) + "</label><input name='jx_" + idx + "' value='" + htmlEscape(devices[i].joy.xAddr) + "'>";
       html += "<div class='chk'><input type='checkbox' name='jix_" + idx + "' value='1'" + String(devices[i].joy.invertX ? " checked" : "") + ">";
-      html += "<span>Invert X (+/- 反転)</span></div>";
-      html += "<label>Y Address</label><input name='jy_" + idx + "' value='" + htmlEscape(devices[i].joy.yAddr) + "'>";
+      html += "<span>" + String(tr("Invert X (+/-)", "X軸反転 (+/-)")) + "</span></div>";
+      html += "<label>" + String(tr("Y Address", "Y軸OSCアドレス")) + "</label><input name='jy_" + idx + "' value='" + htmlEscape(devices[i].joy.yAddr) + "'>";
       html += "<div class='chk'><input type='checkbox' name='jiy_" + idx + "' value='1'" + String(devices[i].joy.invertY ? " checked" : "") + ">";
-      html += "<span>Invert Y (+/- 反転)</span></div>";
-      html += "<label>Deadband</label><input type='number' name='jd_" + idx + "' value='" + String(devices[i].joy.deadband) + "'>";
-      html += "<label>Out Min</label><input type='number' step='any' name='jo_" + idx + "' value='" + String(devices[i].joy.map.outMin) + "'>";
-      html += "<label>Out Max</label><input type='number' step='any' name='jO_" + idx + "' value='" + String(devices[i].joy.map.outMax) + "'>";
-      html += "<label>Out Type</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div>";
+      html += "<span>" + String(tr("Invert Y (+/-)", "Y軸反転 (+/-)")) + "</span></div>";
+      html += "<label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='jd_" + idx + "' value='" + String(devices[i].joy.deadband) + "'>";
+      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='jo_" + idx + "' value='" + String(devices[i].joy.map.outMin) + "'>";
+      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='jO_" + idx + "' value='" + String(devices[i].joy.map.outMax) + "'>";
+      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div>";
       html += "<div class='click-section joystick-click'>";
       html += clickModeHtml("jm_" + idx, devices[i].joy.clickMode, "jpr_" + idx, "jsq_" + idx);
       html += clickMessagesHtml(idx,"j",joySeq,devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount);
       html += "<div id='jsq_" + idx + "' class='click-sequence' style='display:" + String(joySeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
-      html += "<label>Address</label><input name='jk_" + idx + "' value='" + htmlEscape(devices[i].joy.clickSeq.address) + "'>";
-      html += "<label>Start</label><input type='number' step='any' name='jn_" + idx + "' value='" + String(devices[i].joy.clickSeq.start) + "'>";
-      html += "<label>End</label><input type='number' step='any' name='j2_" + idx + "' value='" + String(devices[i].joy.clickSeq.end) + "'>";
-      html += "<label>Step</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
+      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='jk_" + idx + "' value='" + htmlEscape(devices[i].joy.clickSeq.address) + "'>";
+      html += "<label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='jn_" + idx + "' value='" + String(devices[i].joy.clickSeq.start) + "'>";
+      html += "<label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='j2_" + idx + "' value='" + String(devices[i].joy.clickSeq.end) + "'>";
+      html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
       html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
-      html += "<div class='ang'><strong>ToF Distance (mm)</strong>";
-      html += "<label>Address</label><input name='fa_" + idx + "' value='" + htmlEscape(devices[i].tof.addr) + "'>";
-      html += "<label>Deadband (mm)</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
-      html += "<label>Maximum Distance (mm)</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'>";
+      html += "<div class='ang'><strong>" + String(tr("ToF Distance (mm)", "ToF距離 (mm)")) + "</strong>";
+      html += "<label>" + String(tr("Address", "OSCアドレス")) + "</label><input name='fa_" + idx + "' value='" + htmlEscape(devices[i].tof.addr) + "'>";
+      html += "<label>" + String(tr("Deadband (mm)", "不感帯 (mm)")) + "</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
+      html += "<label>" + String(tr("Maximum Distance (mm)", "最大距離 (mm)")) + "</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'>";
       html += "<label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
-      html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Min / Far → Out Max", "近い → Out Min / 遠い → Out Max")) + "</option>";
-      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Max / Far → Out Min", "近い → Out Max / 遠い → Out Min")) + "</option></select>";
-      html += "<label>Out Min</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'>";
-      html += "<label>Out Max</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'>";
-      html += "<label>Out Type</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType);
-      html += "<p class='note'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、Maximum Distance未満です。範囲外ではOSC送信を停止します。")) + "</p></div>";
+      html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Min / Far → Out Max", "近い → 出力最小値／遠い → 出力最大値")) + "</option>";
+      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Max / Far → Out Min", "近い → 出力最大値／遠い → 出力最小値")) + "</option></select>";
+      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'>";
+      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'>";
+      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType);
+      html += "<p class='note'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、最大距離未満です。範囲外ではOSC送信を停止します。")) + "</p></div>";
     } else {
       html += "<p class='note'>Type code: " + String((int)devices[i].type) + "</p>";
     }
@@ -893,7 +899,7 @@ void handleSave() {
       candidate.nearValueHigh = server.hasArg("fi_" + idx) && server.arg("fi_" + idx).toInt() != 0;
       if (candidate.deadband < 1 || candidate.deadband > 2000 ||
           candidate.maxDistanceMm < 31 || candidate.maxDistanceMm > 2000) {
-        sendUiResult(400, tr("Save error", "保存エラー"), tr("ToF Maximum Distance must be 31–2000 mm and Deadband must be 1–2000 mm.", "ToFのMaximum Distanceは31～2000 mm、Deadbandは1～2000 mmに設定してください。")); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), tr("ToF Maximum Distance must be 31–2000 mm and Deadband must be 1–2000 mm.", "ToFの最大距離は31～2000 mm、不感帯は1～2000 mmに設定してください。")); return;
       }
       if (server.hasArg("fo_" + idx)) candidate.map.outMin = server.arg("fo_" + idx).toFloat();
       if (server.hasArg("fO_" + idx)) candidate.map.outMax = server.arg("fO_" + idx).toFloat();
