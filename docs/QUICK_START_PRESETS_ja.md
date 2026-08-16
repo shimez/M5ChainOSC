@@ -16,6 +16,7 @@ permalink: /quick-start-presets/
 ## 用意するもの
 
 - M5Stack AtomS3R
+- M5Stack Atomic ToChain Base
 - 対応するM5Stack Chainデバイス
 - データ通信対応USBケーブル
 - 2.4 GHz帯のWi-Fi

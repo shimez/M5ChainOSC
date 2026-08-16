@@ -16,6 +16,7 @@ This guide takes you from firmware installation to sending OSC to VRChat with a 
 ## What you need
 
 - M5Stack AtomS3R
+- M5Stack Atomic ToChain Base
 - A supported M5Stack Chain device
 - A USB cable that supports data
 - A 2.4 GHz Wi-Fi network
