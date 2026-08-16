@@ -175,6 +175,12 @@ licenses/
 
 不具合報告では、使用したブランチまたはコミット、接続したChainデバイス、再現手順、Arduino IDE／PlatformIOのビルドログを添えてください。
 
+## リリース
+
+GitHub Actionsを使用して、PlatformIOビルド、mergedバイナリとSHA-256の生成、GitHub Releaseのドラフト作成を自動化できます。
+
+バージョン更新、事前テスト、`vX.Y.Z`タグの作成、ドラフトReleaseの確認手順は[リリース手順](docs/RELEASING.md)を参照してください。
+
 ## ライセンス
 
 特に明記がない限り、M5ChainOSCの独自ソースコード、ドキュメントおよびプリセットは[MIT License](LICENSE)で提供されます。
