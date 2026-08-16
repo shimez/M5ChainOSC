@@ -26,6 +26,11 @@
     .note { margin:18px 0 0; padding:15px 17px; border:1px solid #3a4a64; border-radius:13px; background:#192337; color:#d5deed; font-size:14px; line-height:1.65; }
     ol { margin:18px 0 0; padding-left:23px; color:#dce5f2; line-height:1.9; }
     .warning { margin-top:18px; border-left:3px solid #f5b942; padding-left:14px; color:#e6d7ae; font-size:14px; }
+    .english-guide { margin-top:22px; padding:18px 19px; border:1px solid #3a4a64; border-radius:13px; background:#151f31; }
+    .english-guide h3 { margin:0; color:#f1f5f9; font-size:17px; }
+    .english-guide p { margin:8px 0 0; font-size:14px; }
+    .english-guide ol { margin-top:10px; font-size:14px; }
+    .english-guide .warning { margin-bottom:0; }
     .release-history { margin-top:22px; padding:18px 19px; border:1px solid #3a4a64; border-radius:13px; background:#192337; }
     .release-history h3 { margin:0; color:#f1f5f9; font-size:17px; }
     .release-entry { margin:0; padding:14px 0; color:#d5deed; font-size:14px; line-height:1.65; }
@@ -52,7 +57,7 @@
       <div class="install">
         <esp-web-install-button manifest="manifest.json">
           <button slot="activate">Install M5ChainOSC</button>
-          <span slot="unsupported">このブラウザはWeb Serialに対応していません。ChromeまたはEdgeを使用してください。</span>
+          <span slot="unsupported">このブラウザはWeb Serialに対応していません。ChromeまたはEdgeを使用してください。 / This browser does not support Web Serial. Use Chrome or Edge.</span>
         </esp-web-install-button>
       </div>
       <ol>
@@ -62,6 +67,17 @@
       </ol>
       <div class="note">ポートが表示されない場合は、AtomS3R本体のボタンを押しながらUSBへ接続してください。</div>
       <div class="warning">再インストールや消去を行う前に、必要な設定をWeb UIの「Export Settings (JSON)」でバックアップしてください。</div>
+      <div class="english-guide" lang="en" aria-labelledby="english-install-title">
+        <h3 id="english-install-title">Quick Installation Guide (English)</h3>
+        <p>Use desktop Google Chrome or Microsoft Edge.</p>
+        <ol>
+          <li>Connect the AtomS3R with a USB cable that supports data.</li>
+          <li>Select <strong>Install M5ChainOSC</strong> and choose the AtomS3R serial port.</li>
+          <li>Follow the on-screen instructions to complete the installation.</li>
+        </ol>
+        <div class="note">If the port is not listed, hold the physical button on the AtomS3R while reconnecting the USB cable.</div>
+        <div class="warning">Before reinstalling or erasing the device, back up important settings with <strong>Export Settings (JSON)</strong> in the Web UI.</div>
+      </div>
       <div class="release-history" aria-labelledby="release-history-title">
         <h3 id="release-history-title">Version History</h3>
         <p class="release-entry"><strong>Version 1.5.2:</strong> OSC Addressの入力検証をすべてのChainデバイス設定へ適用し、保存した設定をJSONから正しく復元できるよう改善しました。</p>
