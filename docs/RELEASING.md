@@ -16,7 +16,7 @@ Personal Access Tokenの追加は不要です。GitHub Actionsが発行する`GI
 
 - `src/config.h`の`APP_VERSION`
 
-Web InstallerはRelease Assetを参照するため、Release公開後に別のコミットで更新します。
+Web InstallerにはRelease Assetと同一のバイナリを配置するため、Release公開後に別のコミットで更新します。
 
 ## タグを付ける前のActionsテスト
 
@@ -72,15 +72,18 @@ GitHubのドラフトReleaseで次を確認します。
 
 Release公開後、次を新しいバージョンへ更新します。
 
-- `docs/installer/manifest.json`の`version`とRelease Assetの固定URL
+- `docs/installer/manifest.json`の`version`とファームウェアパス
 - `docs/installer/index.html`のStable versionと更新履歴
 - `docs/installer/README.md`の正式版表記と更新履歴
+- `docs/installer/firmware/`へRelease Assetと同一のmergedバイナリを配置
 
-manifestのファームウェアURLは、次の形式にします。
+manifestのファームウェアパスは、次の形式にします。
 
 ```text
-https://github.com/shimez/M5ChainOSC/releases/download/v1.6.0/M5ChainOSC-1.6.0-AtomS3R-merged.bin
+firmware/M5ChainOSC-1.6.0-AtomS3R-merged.bin
 ```
+
+GitHub Releaseからダウンロードしたバイナリを使用し、Releaseに添付されたSHA-256と一致することを確認してください。同一オリジンで配信することで、ブラウザのCORS制限による取得失敗を防ぎます。
 
 Installerの整合性を確認します。
 

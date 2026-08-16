@@ -68,10 +68,7 @@ def main() -> None:
                 f"APP_VERSION {config_version}."
             )
 
-        expected_release_url = (
-            "https://github.com/shimez/M5ChainOSC/releases/download/"
-            f"v{config_version}/{firmware_name}"
-        )
+        expected_manifest_path = f"firmware/{firmware_name}"
         try:
             part = manifest["builds"][0]["parts"][0]
         except (KeyError, IndexError, TypeError) as exc:
@@ -79,10 +76,16 @@ def main() -> None:
                 "manifest.json does not contain the expected firmware part."
             ) from exc
 
-        if part.get("path") != expected_release_url or part.get("offset") != 0:
+        if part.get("path") != expected_manifest_path or part.get("offset") != 0:
             raise SystemExit(
-                "manifest.json must reference the versioned GitHub Release asset "
-                f"{expected_release_url} at offset 0."
+                "manifest.json must reference "
+                f"{expected_manifest_path} at offset 0."
+            )
+
+        if not (ROOT / "docs" / "installer" / expected_manifest_path).is_file():
+            raise SystemExit(
+                "Web Installer firmware file does not exist: "
+                f"docs/installer/{expected_manifest_path}"
             )
 
         installer_index = read_text("docs/installer/index.html")

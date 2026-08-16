@@ -22,20 +22,20 @@ https://shimez.github.io/M5ChainOSC/installer/
 - Version 1.2.0: 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示に対応
 - Version 1.1.0: Chain ToFの最大距離、範囲外でのOSC送信停止、出力方向の設定に対応
 
-## ファームウェアの配布元
+## ファームウェアの配置
 
-Web Installerは、GitHub ActionsでビルドしてGitHub Releaseへ添付したmergedバイナリを参照します。Version 1.5.1では次の固定URLを使用します。
+Web Installerには、GitHub ActionsでビルドしてGitHub Releaseへ添付したものと同一のmergedバイナリを配置します。Version 1.5.1では次のパスを使用します。
 
 ```text
-https://github.com/shimez/M5ChainOSC/releases/download/v1.5.1/M5ChainOSC-1.5.1-AtomS3R-merged.bin
+docs/installer/firmware/M5ChainOSC-1.5.1-AtomS3R-merged.bin
 ```
 
-`manifest.json`は、このRelease AssetをESP32-S3のoffset `0x0`へ書き込みます。`latest`形式のURLは使わず、Installerの表示バージョンと一致する固定タグのURLを指定します。
+`manifest.json`は、この同一オリジンのファイルをESP32-S3のoffset `0x0`へ書き込みます。GitHub Release AssetのURLはブラウザのCORS制限で取得できない場合があるため、manifestから直接参照しません。
 
 ## リリース前の確認
 
 - `manifest.json`の`version`、Releaseタグ、バイナリのファイル名が一致している
-- Release Assetの固定URLからバイナリを直接ダウンロードできる
+- Installer用バイナリのSHA-256がGitHub Release Assetと一致している
 - mergedバイナリをoffset `0x0`から実機へ書き込める
 - 消去済みAtomS3Rで起動、Wi-Fi設定、Web UI表示、設定保存・復元が動作する
 - 対応するChainデバイスの主要操作が動作する

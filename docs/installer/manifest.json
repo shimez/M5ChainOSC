@@ -9,7 +9,7 @@
       "improv": false,
       "parts": [
         {
-          "path": "https://github.com/shimez/M5ChainOSC/releases/download/v1.5.1/M5ChainOSC-1.5.1-AtomS3R-merged.bin",
+          "path": "firmware/M5ChainOSC-1.5.1-AtomS3R-merged.bin",
           "offset": 0
         }
       ]
