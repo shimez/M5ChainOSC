@@ -13,27 +13,29 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 デスクトップ版のChromeまたはEdgeを使用してください。
 
-現在の正式版は`1.5.0`です。
+現在の正式版は`1.5.1`です。
 
+- Version 1.5.1: Web UI送信時のタイムアウトを調整し、画面が白く表示されることがある問題を改善
 - Version 1.5.0: Chainデバイス設定の日本語表示拡充、Web UIとユーザーガイドの用語統一、各設定パラメータの解説追加、EncoderのIncrementモードに応じた表示整理に対応
 - Version 1.4.0: OSC送信時の画面ちらつきを抑制し、未保存表示、スクロール位置の維持、デバイス設定の折りたたみ、画面遷移のない設定保存・デバイス削除に対応
 - Version 1.3.0: Web UIの英語／日本語切り替え、AtomS3R画面上のバージョン表示、Web UIの表示高速化に対応
 - Version 1.2.0: 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示に対応
 - Version 1.1.0: Chain ToFの最大距離、範囲外でのOSC送信停止、出力方向の設定に対応
 
-## バイナリの配置
+## ファームウェアの配布元
 
-PlatformIOでビルドしたブートローダー、パーティションテーブル、`boot_app0.bin`、アプリ本体を結合したmergedバイナリを、次の名前で配置します。
+Web Installerは、GitHub ActionsでビルドしてGitHub Releaseへ添付したmergedバイナリを参照します。Version 1.5.1では次の固定URLを使用します。
 
 ```text
-docs/installer/firmware/M5ChainOSC-1.5.0-AtomS3R-merged.bin
+https://github.com/shimez/M5ChainOSC/releases/download/v1.5.1/M5ChainOSC-1.5.1-AtomS3R-merged.bin
 ```
 
-`manifest.json`は、このファイルをESP32-S3のoffset `0x0`へ書き込みます。
+`manifest.json`は、このRelease AssetをESP32-S3のoffset `0x0`へ書き込みます。`latest`形式のURLは使わず、Installerの表示バージョンと一致する固定タグのURLを指定します。
 
 ## リリース前の確認
 
-- `manifest.json`の`version`とバイナリのファイル名が一致している
+- `manifest.json`の`version`、Releaseタグ、バイナリのファイル名が一致している
+- Release Assetの固定URLからバイナリを直接ダウンロードできる
 - mergedバイナリをoffset `0x0`から実機へ書き込める
 - 消去済みAtomS3Rで起動、Wi-Fi設定、Web UI表示、設定保存・復元が動作する
 - 対応するChainデバイスの主要操作が動作する
