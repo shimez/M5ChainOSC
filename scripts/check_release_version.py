@@ -32,6 +32,11 @@ def main() -> None:
         help="Release tag such as v1.6.0. Leave empty for a manual dry run.",
     )
     parser.add_argument("--github-output", default="")
+    parser.add_argument(
+        "--check-installer",
+        action="store_true",
+        help="Also validate Web Installer version references.",
+    )
     args = parser.parse_args()
 
     config_version = require_match(
@@ -51,35 +56,42 @@ def main() -> None:
                 f"Tag version {tag_version} does not match APP_VERSION {config_version}."
             )
 
-    manifest = json.loads(read_text("docs/installer/manifest.json"))
-    manifest_version = str(manifest.get("version", ""))
-    if manifest_version != config_version:
-        raise SystemExit(
-            f"manifest.json version {manifest_version} does not match "
-            f"APP_VERSION {config_version}."
-        )
-
     firmware_name = f"M5ChainOSC-{config_version}-AtomS3R-merged.bin"
     checksum_name = f"M5ChainOSC-{config_version}-AtomS3R-SHA256.txt"
-    expected_manifest_path = f"firmware/{firmware_name}"
-    try:
-        part = manifest["builds"][0]["parts"][0]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise SystemExit("manifest.json does not contain the expected firmware part.") from exc
 
-    if part.get("path") != expected_manifest_path or part.get("offset") != 0:
-        raise SystemExit(
-            "manifest.json must reference "
-            f"{expected_manifest_path} at offset 0."
+    if args.check_installer:
+        manifest = json.loads(read_text("docs/installer/manifest.json"))
+        manifest_version = str(manifest.get("version", ""))
+        if manifest_version != config_version:
+            raise SystemExit(
+                f"manifest.json version {manifest_version} does not match "
+                f"APP_VERSION {config_version}."
+            )
+
+        expected_release_url = (
+            "https://github.com/shimez/M5ChainOSC/releases/download/"
+            f"v{config_version}/{firmware_name}"
         )
+        try:
+            part = manifest["builds"][0]["parts"][0]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise SystemExit(
+                "manifest.json does not contain the expected firmware part."
+            ) from exc
 
-    installer_index = read_text("docs/installer/index.html")
-    if f"Stable version {config_version}" not in installer_index:
-        raise SystemExit("Installer index does not show the current stable version.")
+        if part.get("path") != expected_release_url or part.get("offset") != 0:
+            raise SystemExit(
+                "manifest.json must reference the versioned GitHub Release asset "
+                f"{expected_release_url} at offset 0."
+            )
 
-    installer_readme = read_text("docs/installer/README.md")
-    if f"現在の正式版は`{config_version}`です。" not in installer_readme:
-        raise SystemExit("Installer README does not show the current stable version.")
+        installer_index = read_text("docs/installer/index.html")
+        if f"Stable version {config_version}" not in installer_index:
+            raise SystemExit("Installer index does not show the current stable version.")
+
+        installer_readme = read_text("docs/installer/README.md")
+        if f"現在の正式版は`{config_version}`です。" not in installer_readme:
+            raise SystemExit("Installer README does not show the current stable version.")
 
     print(f"Validated release version {config_version}")
     print(f"Firmware: {firmware_name}")
@@ -94,4 +106,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

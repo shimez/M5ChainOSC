@@ -12,15 +12,11 @@ Personal Access Tokenの追加は不要です。GitHub Actionsが発行する`GI
 
 ## タグを作る前の準備
 
-例えば次の正式版を`1.6.0`とする場合、同じコミットで次の内容を`1.6.0`へ揃えます。
+例えば次の正式版を`1.6.0`とする場合、ファームウェアを公開する最初のコミットでは次を更新します。
 
 - `src/config.h`の`APP_VERSION`
-- `docs/installer/manifest.json`の`version`とファームウェアパス
-- `docs/installer/index.html`のStable versionと更新履歴
-- `docs/installer/README.md`の正式版表記、更新履歴、ファームウェアパス
-- `docs/installer/firmware/M5ChainOSC-1.6.0-AtomS3R-merged.bin`
 
-Web Installer用バイナリは、タグを作る前に実機で動作確認してください。
+Web InstallerはRelease Assetを参照するため、Release公開後に別のコミットで更新します。
 
 ## タグを付ける前のActionsテスト
 
@@ -28,7 +24,7 @@ GitHubで`Actions` → `Build and draft release` → `Run workflow`を実行し�
 
 手動実行では以下を行います。
 
-1. バージョン表記の整合性確認
+1. `APP_VERSION`の形式確認
 2. PlatformIOビルド
 3. mergedバイナリ生成
 4. SHA-256生成
@@ -72,9 +68,31 @@ GitHubのドラフトReleaseで次を確認します。
 
 問題がなければ`Publish release`を押します。
 
+## Web Installerを更新する
+
+Release公開後、次を新しいバージョンへ更新します。
+
+- `docs/installer/manifest.json`の`version`とRelease Assetの固定URL
+- `docs/installer/index.html`のStable versionと更新履歴
+- `docs/installer/README.md`の正式版表記と更新履歴
+
+manifestのファームウェアURLは、次の形式にします。
+
+```text
+https://github.com/shimez/M5ChainOSC/releases/download/v1.6.0/M5ChainOSC-1.6.0-AtomS3R-merged.bin
+```
+
+Installerの整合性を確認します。
+
+```powershell
+python scripts/check_release_version.py --check-installer
+```
+
+確認後にInstaller関連の変更をコミットして`main`へpushし、公開ページから実機へ書き込めることを確認します。
+
 ## バージョン不一致時
 
-タグとファイル内のバージョンが一致しない場合、ワークフローはReleaseを作成せずエラー終了します。
+タグと`APP_VERSION`が一致しない場合、ワークフローはReleaseを作成せずエラー終了します。Web Installerの整合性は`--check-installer`を指定して別途確認します。
 
 タグをまだGitHubへpushしていない場合は、ローカルタグを削除して修正できます。
 
@@ -83,4 +101,3 @@ git tag -d v1.6.0
 ```
 
 すでにタグをpushした場合は、失敗原因を修正した新しいコミットへ同じタグを付け直すより、状況を確認してから対応してください。公開済みReleaseのタグは移動しないでください。
-
