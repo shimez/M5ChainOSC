@@ -6,6 +6,8 @@ permalink: /quick-start-presets/
 
 # M5ChainOSC プリセット・クイックスタート
 
+[English version](../en/quick-start-presets/)
+
 このガイドでは、公開されているデバイスプリセットを使い、M5ChainOSCからVRChatへOSCメッセージを送信するまでを説明します。各設定項目の詳細は[日本語ユーザーガイド](../user-guide/)を参照してください。
 
 > [!IMPORTANT]

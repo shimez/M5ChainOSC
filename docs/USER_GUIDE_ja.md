@@ -6,6 +6,8 @@ permalink: /user-guide/
 
 # M5ChainOSC 日本語ユーザーガイド
 
+[English version](../en/user-guide/)
+
 このガイドでは、AtomS3Rへの書き込みが完了した後の初期設定と、Web UIの使い方を説明します。
 
 > [!IMPORTANT]
@@ -291,7 +293,7 @@ Wi-FiのSSIDとパスワードは含まれません。現在のJSONファイル�
 
 ## 12. 全設定の初期化
 
-AtomS3R本体のボタンを10秒間長押しします。画面に進捗が表示され、完了すると次の設定が消去されます。
+AtomS3R本体の画面を10秒間長押しします。画面に進捗が表示され、完了すると次の設定が消去されます。
 
 - Wi-Fi
 - OSC送信先

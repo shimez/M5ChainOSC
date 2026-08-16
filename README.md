@@ -64,7 +64,7 @@ PlatformIOでは`platformio.ini`の`lib_deps`から自動取得されます。Ar
 5. AtomS3Rの再起動後、画面に表示されたIPアドレス、または`http://atoms3r-osc.local/`をブラウザーで開きます。
 6. OSC送信先と各Chainデバイスを設定し、`Save All Settings`を押します。
 
-詳しい操作方法は[日本語ユーザーガイド](https://shimez.github.io/M5ChainOSC/user-guide/)を参照してください。ガイドのMarkdown原稿は[docs/USER_GUIDE_ja.md](docs/USER_GUIDE_ja.md)にあります。
+詳しい操作方法は[日本語ユーザーガイド](https://shimez.github.io/M5ChainOSC/user-guide/)または[English User Guide](https://shimez.github.io/M5ChainOSC/en/user-guide/)を参照してください。Markdown原稿は[docs/USER_GUIDE_ja.md](docs/USER_GUIDE_ja.md)と[docs/USER_GUIDE_en.md](docs/USER_GUIDE_en.md)にあります。
 
 ## PlatformIO
 
@@ -156,12 +156,16 @@ src/
   wifi_manager.*        Wi-Fi STA／AP処理
   osc_send.*            OSC送信
 docs/
+  QUICK_START_PRESETS_en.md
+                        Preset Quick Start in English
   QUICK_START_PRESETS_ja.md
                         プリセットを使ったクイックスタート
+  USER_GUIDE_en.md      English User Guide
   USER_GUIDE_ja.md      日本語ユーザーガイド
   installer/            正式版Web Installer
 presets/
   README.md              デバイスプリセット一覧と使用方法
+  README_en.md           Device preset guide in English
   angle/                 Angle用プリセット
   encoder/               Encoder用プリセット
   joystick/              Joystick用プリセット

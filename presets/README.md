@@ -1,5 +1,7 @@
 # M5ChainOSC Device Presets
 
+[English version](README_en.md)
+
 M5ChainOSCで利用できる、Chainデバイス単体の設定サンプルです。
 
 > [!IMPORTANT]
