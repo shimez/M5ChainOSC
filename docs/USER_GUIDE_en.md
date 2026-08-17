@@ -38,6 +38,9 @@ From a device on the same network as the AtomS3R, open either:
 
 Some environments do not support mDNS `.local` addresses. Use the displayed IP address in that case.
 
+> [!IMPORTANT]
+> The Web UI does not require authentication. Use M5ChainOSC only on a trusted local network, such as your home LAN. Use on shared networks at event venues, hotels, or public Wi-Fi hotspots is not recommended.
+
 ## 3. Common settings
 
 ### Language

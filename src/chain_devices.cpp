@@ -4,6 +4,13 @@
 #include "osc_send.h"
 #include "display.h"
 
+static void sendMessagesWithFeedback(const ChainDevice& device,
+                                     const OSCMessage* messages,
+                                     uint8_t count) {
+  for (uint8_t i = 0; i < count; i++) sendOSC(messages[i]);
+  queueOscFeedback(deviceDisplayName(device), messages, count);
+}
+
 // ---------------------------------------------------------------------------
 // Poll helpers
 // ---------------------------------------------------------------------------
@@ -82,12 +89,10 @@ void pollEncoder(ChainDevice& d) {
       }
     } else if (st == 1) {
       setOperationalLed(d, color_red);
-      for(uint8_t i=0;i<d.enc.pressMessageCount;i++) sendOSC(d.enc.pressMessages[i]);
-      if(d.enc.pressMessageCount){const OSCMessage& m=d.enc.pressMessages[d.enc.pressMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
+      sendMessagesWithFeedback(d, d.enc.pressMessages, d.enc.pressMessageCount);
     } else {
       setOperationalLed(d, color_blue);
-      for(uint8_t i=0;i<d.enc.releaseMessageCount;i++) sendOSC(d.enc.releaseMessages[i]);
-      if(d.enc.releaseMessageCount){const OSCMessage& m=d.enc.releaseMessages[d.enc.releaseMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
+      sendMessagesWithFeedback(d, d.enc.releaseMessages, d.enc.releaseMessageCount);
     }
     d.lastButtonStatus = st;
   }
@@ -155,12 +160,10 @@ void pollJoystick(ChainDevice& d) {
       }
     } else if (st == 1) {
       setOperationalLed(d, color_red);
-      for(uint8_t i=0;i<d.joy.pressMessageCount;i++) sendOSC(d.joy.pressMessages[i]);
-      if(d.joy.pressMessageCount){const OSCMessage& m=d.joy.pressMessages[d.joy.pressMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
+      sendMessagesWithFeedback(d, d.joy.pressMessages, d.joy.pressMessageCount);
     } else {
       setOperationalLed(d, color_blue);
-      for(uint8_t i=0;i<d.joy.releaseMessageCount;i++) sendOSC(d.joy.releaseMessages[i]);
-      if(d.joy.releaseMessageCount){const OSCMessage& m=d.joy.releaseMessages[d.joy.releaseMessageCount-1];showOscFeedback(deviceDisplayName(d),m.address,m.valueStr);}
+      sendMessagesWithFeedback(d, d.joy.releaseMessages, d.joy.releaseMessageCount);
     }
     d.lastButtonStatus = st;
   }
@@ -251,18 +254,12 @@ void pollAllDevices() {
         }
       } else if (st == 1) {
         setOperationalLed(devices[i], color_red);
-        for (uint8_t m = 0; m < devices[i].pressMessageCount; m++) sendOSC(devices[i].pressMessages[m]);
-        if (devices[i].pressMessageCount > 0) {
-          const OSCMessage& last = devices[i].pressMessages[devices[i].pressMessageCount - 1];
-          showOscFeedback(deviceDisplayName(devices[i]), last.address, last.valueStr);
-        }
+        sendMessagesWithFeedback(devices[i], devices[i].pressMessages,
+                                 devices[i].pressMessageCount);
       } else {
         setOperationalLed(devices[i], color_blue);
-        for (uint8_t m = 0; m < devices[i].releaseMessageCount; m++) sendOSC(devices[i].releaseMessages[m]);
-        if (devices[i].releaseMessageCount > 0) {
-          const OSCMessage& last = devices[i].releaseMessages[devices[i].releaseMessageCount - 1];
-          showOscFeedback(deviceDisplayName(devices[i]), last.address, last.valueStr);
-        }
+        sendMessagesWithFeedback(devices[i], devices[i].releaseMessages,
+                                 devices[i].releaseMessageCount);
       }
       devices[i].lastButtonStatus = st;
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111827">
   <title>M5ChainOSC Web Installer</title>
-  <meta name="description" content="M5ChainOSC 1.5.2をAtomS3Rへブラウザからインストールします。">
+  <meta name="description" content="M5ChainOSC 1.5.3をAtomS3Rへブラウザからインストールします。">
   <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <style>
     :root { color-scheme: dark; --bg:#090d18; --card:#111827; --card2:#172033; --text:#f8fafc; --muted:#aab4c5; --line:#2a3850; --accent:#7c5cff; --accent2:#4f8cff; --ok:#59d499; }
@@ -47,7 +47,7 @@
     <header class="hero">
       <h1>M5ChainOSC</h1>
       <p class="lead">AtomS3Rへファームウェアを、ブラウザから簡単にインストールできます。</p>
-      <span class="version">Stable version 1.5.2</span>
+      <span class="version">Stable version 1.5.3</span>
       <p class="unofficial">M5ChainOSCは個人が開発する非公式プロジェクトです。M5Stack Technology Co., Ltd.による公式製品ではなく、同社との提携または承認を示すものではありません。</p>
     </header>
 
@@ -80,6 +80,7 @@
       </div>
       <div class="release-history" aria-labelledby="release-history-title">
         <h3 id="release-history-title">Version History</h3>
+        <p class="release-entry"><strong>Version 1.5.3:</strong> AtomS3R画面の描画範囲を最適化してちらつきを抑え、複数のOSCメッセージを送信した際に内容を順番に確認できるよう改善しました。</p>
         <p class="release-entry"><strong>Version 1.5.2:</strong> OSC Addressの入力検証をすべてのChainデバイス設定へ適用し、保存した設定をJSONから正しく復元できるよう改善しました。</p>
         <p class="release-entry"><strong>Version 1.5.1:</strong> Web UI送信時のタイムアウトを調整し、画面が白く表示されることがある問題を改善しました。</p>
         <p class="release-entry"><strong>Version 1.5.0:</strong> Chainデバイス設定の日本語表示を拡充し、Web UIと日本語ユーザーガイドの用語を統一しました。ユーザーガイドへ各設定パラメータの詳しい解説を追加し、EncoderのIncrementモードでは不要なAbsolute入力設定を非表示にしました。</p>

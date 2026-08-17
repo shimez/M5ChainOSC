@@ -130,6 +130,7 @@ void appLoop() {
 
   // --- Poll connected Chain devices & send OSC --------------------------
   pollAllDevices();
+  updateOscFeedbackDisplay();
   delay(10);
 }
 

@@ -42,6 +42,9 @@ If the port is missing, hold the physical button on the AtomS3R while reconnecti
 
 The AtomS3R supports 2.4 GHz Wi-Fi only. Connect it and the VRChat computer to the same network where they can communicate with each other.
 
+> [!IMPORTANT]
+> The Web UI does not require authentication. Use M5ChainOSC only on a trusted local network, such as your home LAN.
+
 ## 3. Enable OSC in VRChat
 
 ```text

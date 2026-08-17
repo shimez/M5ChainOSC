@@ -10,6 +10,16 @@ static void drawVersionHeader() {
 }
 
 static const int MAIN_FEEDBACK_Y = 52;
+static const int MAIN_FEEDBACK_CONTENT_Y = MAIN_FEEDBACK_Y + 2;
+static const unsigned long OSC_FEEDBACK_INTERVAL_MS = 200;
+static const uint8_t MAX_PENDING_OSC_FEEDBACK = MAX_KEY_OSC_MESSAGES * 2;
+
+static String queuedOscName[MAX_PENDING_OSC_FEEDBACK];
+static String queuedOscAddr[MAX_PENDING_OSC_FEEDBACK];
+static String queuedOscVal[MAX_PENDING_OSC_FEEDBACK];
+static uint8_t queuedOscCount = 0;
+static uint8_t queuedOscIndex = 0;
+static unsigned long nextOscFeedbackMs = 0;
 
 static void drawMainFeedbackArea(bool clearArea) {
   const int screenW = M5.Display.width();
@@ -17,13 +27,11 @@ static void drawMainFeedbackArea(bool clearArea) {
   const int cols    = 21;
 
   if (clearArea) {
-    M5.Display.fillRect(0, MAIN_FEEDBACK_Y, screenW,
-                        screenH - MAIN_FEEDBACK_Y, TFT_BLACK);
+    M5.Display.fillRect(0, MAIN_FEEDBACK_CONTENT_Y, screenW,
+                        screenH - MAIN_FEEDBACK_CONTENT_Y, TFT_BLACK);
   }
 
   if (hasOscFeedback) {
-    M5.Display.drawFastHLine(2, MAIN_FEEDBACK_Y, screenW - 4, TFT_DARKGREY);
-
     M5.Display.setTextColor(TFT_CYAN, TFT_BLACK);
     M5.Display.setCursor(2, 56);
     String n = lastOscName;
@@ -68,9 +76,29 @@ static void drawMainFeedbackArea(bool clearArea) {
     M5.Display.print(v);
   } else {
     M5.Display.setTextColor(TFT_GREEN, TFT_BLACK);
-    M5.Display.setCursor(2, 56);
+    M5.Display.setCursor(2, 68);
     M5.Display.println(deviceCount > 0 ? "Waiting..." : "No Device");
   }
+}
+
+static void clearOscFeedbackQueue() {
+  for (uint8_t i = 0; i < queuedOscCount; i++) {
+    queuedOscName[i] = "";
+    queuedOscAddr[i] = "";
+    queuedOscVal[i] = "";
+  }
+  queuedOscCount = 0;
+  queuedOscIndex = 0;
+  nextOscFeedbackMs = 0;
+}
+
+static void renderOscFeedback(const String& name, const String& address,
+                              const String& value) {
+  lastOscName = name;
+  lastOscAddr = address;
+  lastOscVal = value;
+  hasOscFeedback = true;
+  drawMainFeedbackArea(true);
 }
 
 void applyDisplayRotation() {
@@ -131,15 +159,53 @@ void drawMainScreen() {
   M5.Display.setCursor(2, 40);
   M5.Display.printf("Dev:%d", deviceCount);
 
+  M5.Display.drawFastHLine(2, MAIN_FEEDBACK_Y, M5.Display.width() - 4,
+                           TFT_DARKGREY);
   drawMainFeedbackArea(false);
 }
 
 void showOscFeedback(const String& name, const String& address, const String& value) {
-  lastOscName  = name;
-  lastOscAddr  = address;
-  lastOscVal   = value;
-  hasOscFeedback = true;
-  drawMainFeedbackArea(true);
+  clearOscFeedbackQueue();
+  renderOscFeedback(name, address, value);
+}
+
+void queueOscFeedback(const String& name, const OSCMessage* messages,
+                      uint8_t count) {
+  if (messages == nullptr || count == 0) return;
+
+  uint8_t first = 0;
+  if (queuedOscIndex >= queuedOscCount) {
+    clearOscFeedbackQueue();
+    renderOscFeedback(name, messages[0].address, messages[0].valueStr);
+    first = 1;
+  }
+
+  for (uint8_t i = first;
+       i < count && queuedOscCount < MAX_PENDING_OSC_FEEDBACK; i++) {
+    queuedOscName[queuedOscCount] = name;
+    queuedOscAddr[queuedOscCount] = messages[i].address;
+    queuedOscVal[queuedOscCount] = messages[i].valueStr;
+    queuedOscCount++;
+  }
+  if (queuedOscCount > 0) nextOscFeedbackMs = millis() + OSC_FEEDBACK_INTERVAL_MS;
+}
+
+void updateOscFeedbackDisplay() {
+  if (queuedOscIndex >= queuedOscCount) return;
+  unsigned long now = millis();
+  if ((long)(now - nextOscFeedbackMs) < 0) return;
+
+  renderOscFeedback(queuedOscName[queuedOscIndex], queuedOscAddr[queuedOscIndex],
+                    queuedOscVal[queuedOscIndex]);
+  queuedOscName[queuedOscIndex] = "";
+  queuedOscAddr[queuedOscIndex] = "";
+  queuedOscVal[queuedOscIndex] = "";
+  queuedOscIndex++;
+  if (queuedOscIndex < queuedOscCount) {
+    nextOscFeedbackMs = now + OSC_FEEDBACK_INTERVAL_MS;
+  } else {
+    clearOscFeedbackQueue();
+  }
 }
 
 void showResetProgress(unsigned long heldMs) {

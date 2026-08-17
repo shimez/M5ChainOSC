@@ -6,6 +6,8 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.5.3]
+
 ### Added
 
 - 日本語ユーザーガイド、プリセット・クイックスタート、デバイスプリセット一覧の英語版を追加
@@ -14,11 +16,19 @@ M5ChainOSCの主な変更履歴を記録します。
 - VRChatでOSCを有効にする手順を日本語ユーザーガイドへ追加
 - KeyのAFK操作、Angle／Encoderのカメラズーム用VRChatプリセットを一覧へ追加
 - EncoderのAbsoluteモードにおける入力範囲と循環動作の詳しい解説を追加
+- Web UIを信頼できるローカルネットワークで使用するよう、READMEと各ガイドへ注意事項を追加
 
 ### Changed
 
 - GitHub PagesをGitHub Actionsから配信し、公開済みReleaseのmergedバイナリをWeb Installerへ自動的に組み込む構成へ変更
 - GitHub Pages関連ActionsをNode.js 24対応版へ更新
+- AtomS3R起動直後の`Waiting...`表示位置を調整
+- OSC送信時に区切り線を再描画せず、画面の書き換え範囲を縮小
+- 複数OSCメッセージの送信内容を200 ms間隔で順番に表示
+
+### Fixed
+
+- ボタンを離した際に、Press側のOSCメッセージ表示待ちが消去される問題を修正
 
 ## [1.5.2]
 
@@ -110,6 +120,7 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.5.2...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.5.3...HEAD
+[1.5.3]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.3
 [1.5.2]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.2
 [1.5.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.1

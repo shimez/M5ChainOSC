@@ -42,6 +42,9 @@ permalink: /quick-start-presets/
 
 AtomS3Rが接続できるWi-Fiは2.4 GHz帯のみです。AtomS3RとVRChatを実行するPCは、互いに通信できる同じネットワークへ接続してください。
 
+> [!IMPORTANT]
+> Web UIには認証機能がありません。M5ChainOSCは、家庭内LANなど信頼できるローカルネットワークで使用してください。
+
 ## 3. VRChatでOSCを有効にする
 
 VRChat内で次の順に操作し、OSCを有効にします。
