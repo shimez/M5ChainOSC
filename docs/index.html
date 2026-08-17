@@ -51,6 +51,11 @@
       background: var(--ok);
       box-shadow: 0 0 0 4px #59d49920;
     }
+    .hero-actions { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+    .hero-link { padding: 10px 15px; border: 1px solid #4b5b75; border-radius: 11px; color: #e5ebf5; background: #121b2c; font-size: 14px; font-weight: 700; text-decoration: none; }
+    .hero-link.primary { border-color: transparent; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+    .hero-link:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .hero-link:focus-visible { outline: 3px solid #a9b9ff; outline-offset: 3px; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
     .card {
       display: flex;
@@ -105,6 +110,7 @@
       main { padding-top: 36px; }
       .grid, .features { grid-template-columns: 1fr; }
       .card { min-height: 0; padding: 22px; }
+      .hero-actions { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -115,6 +121,10 @@
       <p class="lead">常駐アプリなしでOSCメッセージを直接送信。設定はブラウザーから行えます。</p>
       <p class="lead lead-en" lang="en">Send OSC messages directly—no companion app required. Configure everything from your browser.</p>
       <span class="status">Documentation &amp; Web Installer</span>
+      <nav class="hero-actions" aria-label="Primary links">
+        <a class="hero-link" href="quick-start-presets/">クイックスタート</a>
+        <a class="hero-link primary" href="installer/">Web Installer</a>
+      </nav>
     </header>
 
     <section class="grid" aria-label="M5ChainOSC resources">
