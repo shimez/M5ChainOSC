@@ -6,6 +6,18 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.6.0]
+
+### Added
+
+- M5ChainOSCとChainOSCminiで共有するデバイスプリセット形式`ChainOSC-device-preset`に対応
+- 旧`M5ChainOSC-device-preset`形式のインポート互換性を維持
+
+### Changed
+
+- デバイス単位の新規エクスポートと公式Presetsを共通プリセット形式へ移行
+- エクスポートファイル名を`ChainOSC-<DeviceType>-preset.json`へ変更
+
 ## [1.5.3]
 
 ### Added
@@ -120,7 +132,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.5.3...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.6.0
 [1.5.3]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.3
 [1.5.2]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.2
 [1.5.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.1

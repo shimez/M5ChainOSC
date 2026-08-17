@@ -13,6 +13,8 @@ M5ChainOSCで利用できる、Chainデバイス単体の設定サンプルで�
 
 プリセットのファイル名は`デバイス種別-用途.json`の形式です。ダウンロード後も、ファイル名の先頭からインポート対象のChainデバイスを判別できます。
 
+プリセットJSONはM5ChainOSCとChainOSCminiで共通の`ChainOSC-device-preset`形式です。M5ChainOSC固有の全体設定バックアップとは別形式です。
+
 ## 使い方
 
 1. 下の一覧から使用するJSONファイルを開きます。

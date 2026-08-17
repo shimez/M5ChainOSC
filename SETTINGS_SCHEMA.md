@@ -53,7 +53,7 @@ Wi-FiのSSIDとパスワードは含めません。`wifiCredentialsIncluded`は�
 
 ```json
 {
-  "format": "M5ChainOSC-device-preset",
+  "format": "ChainOSC-device-preset",
   "schemaVersion": 1,
   "deviceType": 3,
   "deviceTypeName": "Key",
@@ -66,6 +66,9 @@ Wi-FiのSSIDとパスワードは含めません。`wifiCredentialsIncluded`は�
 }
 ```
 
+- `format`はM5ChainOSCとChainOSCminiで共通の`ChainOSC-device-preset`です。
+- M5ChainOSCは後方互換性のため、旧形式`M5ChainOSC-device-preset`もインポートできます。
+- 新規エクスポートでは共通形式を使用します。
 - UIDとDevice Nameは含めません。
 - インポート先として選択した接続中デバイスのUIDとDevice Nameを維持します。
 - `deviceType`がインポート先と一致しないプリセットは拒否します。

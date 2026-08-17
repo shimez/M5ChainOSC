@@ -230,8 +230,8 @@ static String deviceJson(const ChainDevice& device, bool includeIdentity = true)
            ",\"deviceTypeName\":" + jsonString(String(typeToName(device.type))) +
            ",\"displayName\":" + jsonString(device.displayName);
   } else {
-    out += String("\"format\":\"M5ChainOSC-device-preset\"") +
-           ",\"schemaVersion\":1" +
+    out += String("\"format\":") + jsonString(String(DEVICE_PRESET_FORMAT_NAME)) +
+           ",\"schemaVersion\":" + String(DEVICE_PRESET_SCHEMA_VERSION) +
            ",\"deviceType\":" + String((int)device.type) +
            ",\"deviceTypeName\":" + jsonString(String(typeToName(device.type)));
   }
@@ -1055,7 +1055,7 @@ void handleExportDevicePreset() {
 
   String typeName = String(typeToName(devices[index].type));
   typeName.replace(" ", "-");
-  server.sendHeader("Content-Disposition", "attachment; filename=\"M5ChainOSC-" + typeName + "-preset.json\"");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"ChainOSC-" + typeName + "-preset.json\"");
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json; charset=utf-8", deviceJson(devices[index], false));
 }
@@ -1090,12 +1090,17 @@ void handleImportDevicePreset() {
   }
 
   JsonObject root = document.as<JsonObject>();
-  if (root.isNull() || !root["format"].is<const char*>() ||
-      String(root["format"].as<const char*>()) != "M5ChainOSC-device-preset") {
-    server.send(400, "text/plain; charset=utf-8", tr("This is not an M5ChainOSC device preset.", "M5ChainOSCのデバイスプリセットではありません。"));
+  String presetFormat = root["format"].is<const char*>()
+                            ? String(root["format"].as<const char*>())
+                            : String();
+  if (root.isNull() ||
+      (presetFormat != DEVICE_PRESET_FORMAT_NAME &&
+       presetFormat != LEGACY_DEVICE_PRESET_FORMAT_NAME)) {
+    server.send(400, "text/plain; charset=utf-8", tr("This is not a supported ChainOSC device preset.", "対応するChainOSCデバイスプリセットではありません。"));
     return;
   }
-  if (!root["schemaVersion"].is<int>() || root["schemaVersion"].as<int>() != 1) {
+  if (!root["schemaVersion"].is<int>() ||
+      root["schemaVersion"].as<int>() != DEVICE_PRESET_SCHEMA_VERSION) {
     server.send(400, "text/plain; charset=utf-8", tr("Unsupported or missing preset schemaVersion.", "プリセットのschemaVersionがないか、対応していません。"));
     return;
   }

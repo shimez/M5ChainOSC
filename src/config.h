@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "M5Chain.h"
 
-static const char* APP_VERSION = "1.5.3";
+static const char* APP_VERSION = "1.6.0";
 
 // ---------------------------------------------------------------------------
 // Hardware / bus
@@ -23,6 +23,9 @@ static const size_t MAX_DEVICE_NAME_BYTES = 64;
 static const size_t MAX_DEVICE_CONFIG_BYTES = 3800;
 static const uint16_t SETTINGS_SCHEMA_VERSION = 2;
 static const char* SETTINGS_FORMAT_NAME = "M5ChainOSC-settings";
+static const uint16_t DEVICE_PRESET_SCHEMA_VERSION = 1;
+static const char* DEVICE_PRESET_FORMAT_NAME = "ChainOSC-device-preset";
+static const char* LEGACY_DEVICE_PRESET_FORMAT_NAME = "M5ChainOSC-device-preset";
 
 // Enable only while diagnosing NVS persistence.
 #define M5CHAINOSC_STORAGE_DEBUG 0

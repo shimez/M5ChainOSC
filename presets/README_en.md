@@ -11,6 +11,8 @@ Presets contain neither a UID nor Device Name, so they can be imported into anot
 
 Preset filenames use the format `device-type-purpose.json`, so the compatible Chain device remains identifiable after download.
 
+Preset JSON uses the shared `ChainOSC-device-preset` format supported by M5ChainOSC and ChainOSCmini. It is separate from the M5ChainOSC-specific complete settings backup format.
+
 ## How to use a preset
 
 1. Open a JSON file from the list below.

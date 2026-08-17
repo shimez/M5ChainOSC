@@ -124,6 +124,8 @@ Web UIの`Export Settings (JSON)`から保存済み設定をダウンロード�
 接続中の各Chainデバイス右上にある`…`メニューから、そのデバイス単体の設定をJSONとしてエクスポート・インポートできます。
 
 - プリセットにはUIDとDevice Nameを含みません。
+- プリセット形式`ChainOSC-device-preset`はChainOSCminiと共通です。
+- 旧形式`M5ChainOSC-device-preset`も引き続きインポートできます。
 - 同じ種類のChainデバイスにだけインポートできます。
 - インポート先のUIDとDevice Nameは維持されます。
 - OSC Address、値、出力範囲、動作モードなどの種類別設定が置き換わります。
