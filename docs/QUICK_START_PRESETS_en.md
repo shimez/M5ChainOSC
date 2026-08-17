@@ -74,12 +74,12 @@ Open [Device Presets](https://github.com/shimez/M5ChainOSC/tree/main/presets), c
 
 | Device | Preset | Behavior |
 | --- | --- | --- |
-| Joystick | `joystick/vrchat-move.json` | Move with the stick and jump by pressing it. |
-| Key | `key/vrchat-voice-control.json` | Toggle microphone state. |
-| Key | `key/vrchat-camera-controls.json` | Change several streaming camera settings. |
-| Key | `key/vrchat-afk-control.json` | Toggle AFK mode. |
-| Angle | `angle/vrchat-camerazoom.json` | Adjust camera zoom by angle. |
-| Encoder | `encoder/vrchat-camerazoom.json` | Adjust camera zoom by rotation. |
+| Joystick | `joystick/joystick-vrchat-move.json` | Move with the stick and jump by pressing it. |
+| Key | `key/key-vrchat-voice-control.json` | Toggle microphone state. |
+| Key | `key/key-vrchat-camera-controls.json` | Change several streaming camera settings. |
+| Key | `key/key-vrchat-afk-control.json` | Toggle AFK mode. |
+| Angle | `angle/angle-vrchat-camera-zoom.json` | Adjust camera zoom by angle. |
+| Encoder | `encoder/encoder-vrchat-camera-zoom.json` | Adjust camera zoom by rotation. |
 
 ## 7. Import the preset
 

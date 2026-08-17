@@ -11,6 +11,8 @@ M5ChainOSCで利用できる、Chainデバイス単体の設定サンプルで�
 
 初めてM5ChainOSCを使用する場合は、[プリセット・クイックスタート](https://shimez.github.io/M5ChainOSC/quick-start-presets/)を参照してください。
 
+プリセットのファイル名は`デバイス種別-用途.json`の形式です。ダウンロード後も、ファイル名の先頭からインポート対象のChainデバイスを判別できます。
+
 ## 使い方
 
 1. 下の一覧から使用するJSONファイルを開きます。
@@ -28,7 +30,7 @@ M5ChainOSCで利用できる、Chainデバイス単体の設定サンプルで�
 
 ### Joystick
 
-#### [VRChat Move](joystick/vrchat-move.json)
+#### [VRChat Move](joystick/joystick-vrchat-move.json)
 
 VRChat内の移動をJoystickで行うサンプルです。
 
@@ -38,15 +40,15 @@ VRChat内の移動をJoystickで行うサンプルです。
 
 ### Key
 
-#### [VRChat AFK Control](key/vrchat-afk-control.json)
+#### [VRChat AFK Control](key/key-vrchat-afk-control.json)
 
 VRChatのAFKモードをON／OFFするサンプルです。
 
-#### [VRChat Voice Control](key/vrchat-voice-control.json)
+#### [VRChat Voice Control](key/key-vrchat-voice-control.json)
 
 VRChat内でマイクのON／OFFを操作するサンプルです。
 
-#### [VRChat Camera Controls](key/vrchat-camera-controls.json)
+#### [VRChat Camera Controls](key/key-vrchat-camera-controls.json)
 
 VRChat内のカメラを配信向けに切り替えるサンプルです。
 
@@ -58,13 +60,13 @@ VRChat内のカメラを配信向けに切り替えるサンプルです。
 
 ### Angle
 
-#### [VRChat Camera Zoom](angle/vrchat-camerazoom.json)
+#### [VRChat Camera Zoom](angle/angle-vrchat-camera-zoom.json)
 
 VRChat内のカメラのズームをAngleで調整するサンプルです。
 
 ### Encoder
 
-#### [VRChat Camera Zoom](encoder/vrchat-camerazoom.json)
+#### [VRChat Camera Zoom](encoder/encoder-vrchat-camera-zoom.json)
 
 VRChat内のカメラのズームをEncoderで調整するサンプルです。
 

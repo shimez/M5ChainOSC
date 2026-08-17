@@ -9,6 +9,8 @@ These are reusable configuration examples for individual M5ChainOSC Chain device
 
 Presets contain neither a UID nor Device Name, so they can be imported into another Chain device of the same type. New users can follow the [Preset Quick Start](https://shimez.github.io/M5ChainOSC/en/quick-start-presets/).
 
+Preset filenames use the format `device-type-purpose.json`, so the compatible Chain device remains identifiable after download.
+
 ## How to use a preset
 
 1. Open a JSON file from the list below.
@@ -26,33 +28,33 @@ Presets contain neither a UID nor Device Name, so they can be imported into anot
 
 ### Joystick
 
-#### [VRChat Move](joystick/vrchat-move.json)
+#### [VRChat Move](joystick/joystick-vrchat-move.json)
 
 Move in VRChat with the stick and jump by pressing it. Adjust X/Y assignments, OSC addresses, and axis inversion to match the device orientation.
 
 ### Key
 
-#### [VRChat AFK Control](key/vrchat-afk-control.json)
+#### [VRChat AFK Control](key/key-vrchat-afk-control.json)
 
 Toggle VRChat AFK mode.
 
-#### [VRChat Voice Control](key/vrchat-voice-control.json)
+#### [VRChat Voice Control](key/key-vrchat-voice-control.json)
 
 Toggle the VRChat microphone.
 
-#### [VRChat Camera Controls](key/vrchat-camera-controls.json)
+#### [VRChat Camera Controls](key/key-vrchat-camera-controls.json)
 
 Change camera mode, Spout, and Smooth settings together for streaming.
 
 ### Angle
 
-#### [VRChat Camera Zoom](angle/vrchat-camerazoom.json)
+#### [VRChat Camera Zoom](angle/angle-vrchat-camera-zoom.json)
 
 Adjust the VRChat camera zoom with Angle.
 
 ### Encoder
 
-#### [VRChat Camera Zoom](encoder/vrchat-camerazoom.json)
+#### [VRChat Camera Zoom](encoder/encoder-vrchat-camera-zoom.json)
 
 Adjust the VRChat camera zoom with Encoder rotation.
 

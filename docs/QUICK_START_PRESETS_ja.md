@@ -78,12 +78,12 @@ AtomS3Rと同じネットワークに接続しているアダプターの`IPv4 A
 
 | デバイス | プリセット | 動作 |
 | --- | --- | --- |
-| Joystick | `joystick/vrchat-move.json` | スティックで移動し、押し込みでジャンプします。 |
-| Key | `key/vrchat-voice-control.json` | マイクのON／OFFを操作します。 |
-| Key | `key/vrchat-camera-controls.json` | 配信用カメラ設定をまとめて変更します。 |
-| Key | `key/vrchat-afk-control.json` | AFKモードをON／OFFします。 |
-| Angle | `angle/vrchat-camerazoom.json` | 角度でカメラのズームを調整します。 |
-| Encoder | `encoder/vrchat-camerazoom.json` | 回転でカメラのズームを調整します。 |
+| Joystick | `joystick/joystick-vrchat-move.json` | スティックで移動し、押し込みでジャンプします。 |
+| Key | `key/key-vrchat-voice-control.json` | マイクのON／OFFを操作します。 |
+| Key | `key/key-vrchat-camera-controls.json` | 配信用カメラ設定をまとめて変更します。 |
+| Key | `key/key-vrchat-afk-control.json` | AFKモードをON／OFFします。 |
+| Angle | `angle/angle-vrchat-camera-zoom.json` | 角度でカメラのズームを調整します。 |
+| Encoder | `encoder/encoder-vrchat-camera-zoom.json` | 回転でカメラのズームを調整します。 |
 
 ## 7. プリセットをインポートする
 
