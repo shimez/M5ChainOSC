@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument(
         "--tag",
         default="",
-        help="Release tag such as v1.6.0. Leave empty for a manual dry run.",
+        help="Release tag in vX.Y.Z format. Leave empty for a manual dry run.",
     )
     parser.add_argument("--github-output", default="")
     parser.add_argument(

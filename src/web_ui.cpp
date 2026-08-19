@@ -500,14 +500,16 @@ void handleRoot() {
 <title>OSC Settings</title>
 <style>
 body{font-family:sans-serif;margin:16px;background:#f5f5f5}
+main{max-width:1100px;margin:0 auto}
 .card{background:#fff;padding:16px;border-radius:10px;margin-bottom:16px;box-shadow:0 2px 5px rgba(0,0,0,.1)}
 .saved-settings{margin-top:28px}
-.tool-card .note{margin-bottom:10px}.tool-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tool-row a,.tool-row button{box-sizing:border-box;text-align:center;text-decoration:none;margin:0;padding:11px;border-radius:6px;font-size:15px}.tool-row a{display:block;background:#3267e3;color:#fff}.tool-row button{background:#fff;color:#3267e3;border:1px solid #3267e3}.tool-status{min-height:18px;margin:7px 0 0}@media(max-width:720px){.osc-row{grid-template-columns:52px 1fr}.osc-row .field,.remove-msg{grid-column:2}.key-grid,.seq-grid{grid-template-columns:1fr}.seq-address{grid-column:1}}@media(max-width:520px){.tool-row{grid-template-columns:1fr}}
+.tool-card .note{margin-bottom:10px}.tool-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tool-row a,.tool-row button{box-sizing:border-box;text-align:center;text-decoration:none;margin:0;padding:11px;border-radius:6px;font-size:15px}.tool-row a{display:block;background:#3267e3;color:#fff}.tool-row button{background:#fff;color:#3267e3;border:1px solid #3267e3}.tool-status{min-height:18px;margin:7px 0 0}@media(max-width:720px){.osc-row{grid-template-columns:52px 1fr}.osc-row .field,.remove-msg{grid-column:2}.system-grid,.key-grid,.seq-grid,.encoder-grid{grid-template-columns:1fr}.seq-address,.encoder-address{grid-column:1}.encoder-mode-hidden{display:none}}@media(max-width:520px){.tool-row{grid-template-columns:1fr}}
 h1{font-size:1.4em}h2{margin-top:0;font-size:1.1em}
 label{display:block;margin-top:10px;font-weight:bold;font-size:.9em}
 input,select{width:100%;padding:8px;margin-top:4px;box-sizing:border-box}
 input.invalid,select.invalid{border:2px solid #c73c4a;background:#fff8f8}
 .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}.key-grid label{margin-top:0}
+.system-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}.system-item{padding:10px;background:#f8f9fa;border-radius:6px}.system-item strong{display:block;margin-bottom:5px;font-size:.9em}.system-item code{word-break:break-all}.status{padding:10px 12px;background:#edf3ff;color:#244da7;border:1px solid #cddbf8;border-radius:8px}
 .usage{display:flex;justify-content:space-between;align-items:center;margin:14px 0;padding:11px 13px;border:1px solid #cddbf8;border-radius:9px;background:#edf3ff;color:#244da7}
 .event-tabs{display:flex;gap:4px;padding:4px;background:#edf0f4;border-radius:9px}.event-tab{margin:0;background:transparent;color:#697586}.event-tab.active{background:white;color:#18212f;box-shadow:0 1px 4px #bbb}
 .event-panel{margin-top:12px}.osc-list{display:grid;gap:10px}.osc-row{display:grid;grid-template-columns:62px minmax(180px,1fr) 115px minmax(100px,.55fr) 68px;gap:9px;align-items:start;padding:12px;border:1px solid #dce2ea;border-radius:10px;background:#fbfcfe}
@@ -524,8 +526,8 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .release{border-left:5px solid #007bff;padding-left:10px;margin-top:12px}
 .seq{border-left:5px solid #20c997;padding-left:10px;margin-top:12px}
 .click-sequence{padding:10px;margin-top:12px}
-.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}
-.ang{border-left:5px solid #6610f2;padding-left:10px;margin-top:12px}
+.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{visibility:hidden;pointer-events:none}
+.ang{border-left:5px solid #6610f2;padding-left:10px;margin-top:12px}.angle-grid,.tof-grid,.joystick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.angle-grid label,.tof-grid label,.joystick-grid label{margin-top:0}.angle-address,.tof-address,.joystick-address,.joystick-invert{grid-column:1/-1}.joystick-invert{display:flex;gap:18px;flex-wrap:wrap}.joystick-invert label{display:flex;align-items:center;gap:6px;margin:0}.joystick-invert input{width:auto;margin:0}
 .joy{border-left:5px solid #e83e8c;padding-left:10px;margin-top:12px}
 .device{border-left:5px solid #6f42c1}
 .uid{font-family:monospace;background:#eee;padding:6px 10px;border-radius:4px;word-break:break-all;font-size:.85em}
@@ -538,17 +540,18 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .chk{display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:4px}
 .chk input{width:auto}
 .language-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.language-row h2{margin:0}.language-row form{margin:0;min-width:150px}.language-row select{margin:0}
+@media(max-width:720px){.system-grid,.key-grid,.seq-grid,.encoder-grid,.angle-grid,.tof-grid,.joystick-grid{grid-template-columns:minmax(0,1fr)}.seq-address,.encoder-address,.angle-address,.tof-address,.joystick-address,.joystick-invert{grid-column:1}.encoder-mode-hidden{display:none}.osc-row{grid-template-columns:52px minmax(0,1fr)}.osc-row .field,.remove-msg{grid-column:2;min-width:0}.osc-row input,.osc-row select{min-width:0}.click-section,.sequence-card,.event-panel,.osc-list,.osc-row{box-sizing:border-box;max-width:100%}}
 </style>
 <script>
 const JA=__JA__;const tx=(en,ja)=>JA?ja:en;const MAX_MSG=8;const enc=new TextEncoder();
 function bytes(v){return enc.encode(v).length}
 function toggleMode(pr,sq,sel){if(!pr||!sq)return;if(sel.value==='1'){pr.style.display='none';sq.style.display='block';}else{pr.style.display='block';sq.style.display='none';}}
 function toggleClickMode(prId,sqId,sel){toggleMode(document.getElementById(prId),document.getElementById(sqId),sel);}
-function updateEncoderMode(sel){let enc=sel.closest('.enc'),showAbsolute=sel.value==='0';if(!enc)return;enc.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.style.display=showAbsolute?'':'none')}
+function updateEncoderMode(sel){let enc=sel.closest('.enc'),showAbsolute=sel.value==='0';if(!enc)return;enc.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.classList.toggle('encoder-mode-hidden',!showAbsolute))}
 function showEvent(group,event,btn){document.querySelectorAll('.event-panel[data-group="'+group+'"]').forEach(x=>x.style.display=x.dataset.event===event?'block':'none');btn.parentNode.querySelectorAll('.event-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function allRows(group){return document.querySelectorAll('.osc-row[data-group="'+group+'"]')}
 function renumber(group){let rows=allRows(group),prefix=rows.length?rows[0].dataset.prefix:document.querySelector('.add-msg[data-group="'+group+'"]').dataset.prefix,idx=group.substring(prefix.length);['press','release'].forEach(ev=>{document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="'+ev+'"]').forEach((r,i)=>{let p=prefix+(ev==='press'?'p':'r');r.querySelector('.msg-address').name=p+'a_'+idx+'_'+i;r.querySelector('.type').name=p+'t_'+idx+'_'+i;r.querySelector('.msg-value').name=p+'v_'+idx+'_'+i})});let n=rows.length;document.getElementById('count_'+group).textContent=n;document.getElementById('pc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="press"]').length;document.getElementById('rc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="release"]').length;document.querySelectorAll('.add-msg[data-group="'+group+'"]').forEach(b=>b.disabled=n>=MAX_MSG)}
-function markDirty(){let s=document.getElementById('dirty-status');if(!s)return;window.settingsDirty=true;s.hidden=false}
+function markDirty(event){if(event&&event.target&&event.target.matches('input[type="file"]'))return;let s=document.getElementById('dirty-status');if(!s)return;window.settingsDirty=true;s.hidden=false}
 function moveMsg(btn,d){let r=btn.closest('.osc-row'),s=d<0?r.previousElementSibling:r.nextElementSibling;if(!s)return;d<0?r.parentNode.insertBefore(r,s):r.parentNode.insertBefore(s,r);renumber(r.dataset.group);markDirty()}
 function removeMsg(btn){let r=btn.closest('.osc-row'),g=r.dataset.group;r.remove();renumber(g);markDirty()}
 function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>'+tx('OSC Address','OSCアドレス')+'</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>'+tx('Type','型')+'</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>'+tx('Value','値')+'</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">'+tx('Delete','削除')+'</button>';list.appendChild(r);renumber(g);markDirty();r.querySelector('.msg-address').focus()}
@@ -569,11 +572,11 @@ function toggleDeviceMenu(event,index){event.stopPropagation();let menu=document
 function toggleDeviceCollapse(index,key){let body=document.getElementById('device-body-'+index),button=document.getElementById('collapse-'+index),collapsed=!body.hidden;body.hidden=collapsed;button.classList.toggle('collapsed',collapsed);button.setAttribute('aria-expanded',collapsed?'false':'true');sessionStorage.setItem('m5osc-collapse-'+key,collapsed?'1':'0')}
 function chooseDevicePreset(index){document.getElementById('preset-file-'+index).click()}
 async function identifyDevice(index,uid){closeDeviceMenus();let status=document.getElementById('preset-status-'+index);status.textContent='';try{let body='index='+encodeURIComponent(index)+'&uid='+encodeURIComponent(uid),response=await fetch('/identify_device',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body}),message=await response.text();if(!response.ok)throw new Error(message);status.textContent=''}catch(e){status.textContent=e.message;alert(e.message)}}
-async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,tx('The preset file is too large.','プリセットファイルが大きすぎます。'));input.value='';return}if(!confirm(tx('Apply this preset to the selected device? Its device settings will be overwritten.','選択したデバイスへこのプリセットを適用しますか？デバイス設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing preset...','プリセットをインポート中...');try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
+async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,tx('The preset file is too large.','プリセットファイルが大きすぎます。'));input.value='';return}if(!confirm(tx('Apply this preset to the selected device? Its device settings will be overwritten.','選択したデバイスへこのプリセットを適用しますか？デバイス設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing preset...','プリセットをインポート中...');try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;window.settingsDirty=false;window.settingsSubmitting=true;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 document.addEventListener('click',()=>closeDeviceMenus());
 function initializePage(){let form=document.getElementById('settings-form');if(form){form.addEventListener('input',markDirty);form.addEventListener('change',markDirty)}initializeMessageRows();document.querySelectorAll('.device[data-collapse-key]').forEach(card=>{let key=card.dataset.collapseKey,index=card.dataset.deviceIndex;if(sessionStorage.getItem('m5osc-collapse-'+key)==='1'){let body=document.getElementById('device-body-'+index),button=document.getElementById('collapse-'+index);body.hidden=true;button.classList.add('collapsed');button.setAttribute('aria-expanded','false')}});let saved=sessionStorage.getItem('m5osc-scroll');if(saved!==null){sessionStorage.removeItem('m5osc-scroll');requestAnimationFrame(()=>window.scrollTo(0,Number(saved)||0))}document.querySelectorAll('form:not(#settings-form)').forEach(f=>f.addEventListener('submit',rememberScroll))}
 window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListener('pageshow',()=>window.settingsSubmitting=false);window.addEventListener('beforeunload',e=>{if(window.settingsDirty&&!window.settingsSubmitting){e.preventDefault();e.returnValue=''}});window.addEventListener('DOMContentLoaded',initializePage)
-</script></head><body><div id='save-toast' class='toast' role='status' aria-live='polite'></div><h1>Chain OSC Setting</h1>
+</script></head><body><main><div id='save-toast' class='toast' role='status' aria-live='polite'></div><h1>Chain OSC Setting</h1>
 )raw";
 
   html.replace("__LANG__", isJapaneseUi() ? "ja" : "en");
@@ -581,6 +584,13 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
 
   html += "<div class='card language-row'><h2>" + String(tr("Language", "言語")) + "</h2><form action='/set_language' method='POST'>";
   html += "<select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form></div>";
+
+  html += "<div class='card'><h2>" + String(tr("System", "システム")) + "</h2>";
+  html += "<p class='status'>" + String(tr("Wi-Fi connected", "Wi-Fi接続済み")) + "</p><div class='system-grid'>";
+  html += "<div class='system-item'><strong>" + String(tr("Product", "製品名")) + "</strong><code>M5ChainOSC</code></div>";
+  html += "<div class='system-item'><strong>Version</strong>" + String(APP_VERSION) + "</div>";
+  html += "<div class='system-item'><strong>" + String(tr("IP Address", "IPアドレス")) + "</strong><code>" + htmlEscape(ipStr) + "</code></div>";
+  html += "<div class='system-item'><strong>mDNS</strong><code>http://atoms3r-osc.local/</code></div></div></div>";
 
   html += "<div class='card'><h2>WiFi</h2><p class='meta'>IP: " + ipStr + "</p>";
   html += "<form action='/delete_wifi' method='POST' onsubmit=\"return confirm('" + String(tr("Delete WiFi settings?", "Wi-Fi設定を削除しますか？")) + "');\">";
@@ -686,18 +696,19 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<div><label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='sp_" + idx + "' value='" + String(devices[i].seq.step) + "'></div>";
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
-      html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong>";
+      html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong><div class='encoder-grid'>";
       html += addressInputHtml(tr("Rotation Address", "回転OSCアドレス"),
-                               "er_" + idx, devices[i].enc.rotAddr);
-      html += "<label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
-      html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select>";
-      const String absoluteStyle = devices[i].enc.sendIncrement ? " style='display:none'" : "";
-      html += "<label class='encoder-absolute-setting'" + absoluteStyle + ">" + String(tr("Abs In Min", "絶対値入力の最小値")) + "</label><input class='encoder-absolute-setting'" + absoluteStyle + " type='number' step='any' name='e0_" + idx + "' value='" + String(devices[i].enc.absInMin) + "'>";
-      html += "<label class='encoder-absolute-setting'" + absoluteStyle + ">" + String(tr("Abs In Max", "絶対値入力の最大値")) + "</label><input class='encoder-absolute-setting'" + absoluteStyle + " type='number' step='any' name='e1_" + idx + "' value='" + String(devices[i].enc.absInMax) + "'>";
-      html += "<label>" + String(tr("Inc Scale", "増分倍率")) + "</label><input type='number' step='any' name='es_" + idx + "' value='" + String(devices[i].enc.incScale) + "'>";
-      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='eo_" + idx + "' value='" + String(devices[i].enc.map.outMin) + "'>";
-      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='eO_" + idx + "' value='" + String(devices[i].enc.map.outMax) + "'>";
-      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div>";
+                               "er_" + idx, devices[i].enc.rotAddr,
+                               "encoder-address");
+      html += "<div><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
+      html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
+      const String absoluteHiddenClass = devices[i].enc.sendIncrement ? " encoder-mode-hidden" : "";
+      html += "<div class='encoder-absolute-setting" + absoluteHiddenClass + "'><label>" + String(tr("Abs In Min", "絶対値入力の最小値")) + "</label><input type='number' step='any' name='e0_" + idx + "' value='" + String(devices[i].enc.absInMin) + "'></div>";
+      html += "<div class='encoder-absolute-setting" + absoluteHiddenClass + "'><label>" + String(tr("Abs In Max", "絶対値入力の最大値")) + "</label><input type='number' step='any' name='e1_" + idx + "' value='" + String(devices[i].enc.absInMax) + "'></div>";
+      html += "<div><label>" + String(tr("Inc Scale", "増分倍率")) + "</label><input type='number' step='any' name='es_" + idx + "' value='" + String(devices[i].enc.incScale) + "'></div>";
+      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='eo_" + idx + "' value='" + String(devices[i].enc.map.outMin) + "'></div>";
+      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='eO_" + idx + "' value='" + String(devices[i].enc.map.outMax) + "'></div>";
+      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div></div></div>";
       html += "<div class='click-section encoder-click'>";
       html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
@@ -709,29 +720,27 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='e3_" + idx + "' value='" + String(devices[i].enc.clickSeq.step) + "'>";
       html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
-      html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong>";
+      html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong><div class='angle-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "aa_" + idx,
-                               devices[i].angle.addr);
-      html += "<label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
-      html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select>";
-      html += "<label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'>";
-      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='ao_" + idx + "' value='" + String(devices[i].angle.map.outMin) + "'>";
-      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='aO_" + idx + "' value='" + String(devices[i].angle.map.outMax) + "'>";
-      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div>";
+                               devices[i].angle.addr, "angle-address");
+      html += "<div><label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
+      html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select></div>";
+      html += "<div><label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'></div>";
+      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='ao_" + idx + "' value='" + String(devices[i].angle.map.outMin) + "'></div>";
+      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='aO_" + idx + "' value='" + String(devices[i].angle.map.outMax) + "'></div>";
+      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
-      html += "<div class='joy'><strong>" + String(tr("Joystick XY", "ジョイスティック XY")) + "</strong>";
+      html += "<div class='joy'><strong>" + String(tr("Joystick XY", "ジョイスティック XY")) + "</strong><div class='joystick-grid'>";
       html += addressInputHtml(tr("X Address", "X軸OSCアドレス"), "jx_" + idx,
-                               devices[i].joy.xAddr);
-      html += "<div class='chk'><input type='checkbox' name='jix_" + idx + "' value='1'" + String(devices[i].joy.invertX ? " checked" : "") + ">";
-      html += "<span>" + String(tr("Invert X (+/-)", "X軸反転 (+/-)")) + "</span></div>";
+                               devices[i].joy.xAddr, "joystick-address");
       html += addressInputHtml(tr("Y Address", "Y軸OSCアドレス"), "jy_" + idx,
-                               devices[i].joy.yAddr);
-      html += "<div class='chk'><input type='checkbox' name='jiy_" + idx + "' value='1'" + String(devices[i].joy.invertY ? " checked" : "") + ">";
-      html += "<span>" + String(tr("Invert Y (+/-)", "Y軸反転 (+/-)")) + "</span></div>";
-      html += "<label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='jd_" + idx + "' value='" + String(devices[i].joy.deadband) + "'>";
-      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='jo_" + idx + "' value='" + String(devices[i].joy.map.outMin) + "'>";
-      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='jO_" + idx + "' value='" + String(devices[i].joy.map.outMax) + "'>";
-      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div>";
+                               devices[i].joy.yAddr, "joystick-address");
+      html += "<div class='joystick-invert'><label><input type='checkbox' name='jix_" + idx + "' value='1'" + String(devices[i].joy.invertX ? " checked" : "") + "><span>" + String(tr("Invert X (+/-)", "X軸反転 (+/-)")) + "</span></label>";
+      html += "<label><input type='checkbox' name='jiy_" + idx + "' value='1'" + String(devices[i].joy.invertY ? " checked" : "") + "><span>" + String(tr("Invert Y (+/-)", "Y軸反転 (+/-)")) + "</span></label></div>";
+      html += "<div><label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='jd_" + idx + "' value='" + String(devices[i].joy.deadband) + "'></div>";
+      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='jo_" + idx + "' value='" + String(devices[i].joy.map.outMin) + "'></div>";
+      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='jO_" + idx + "' value='" + String(devices[i].joy.map.outMax) + "'></div>";
+      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div></div></div>";
       html += "<div class='click-section joystick-click'>";
       html += clickModeHtml("jm_" + idx, devices[i].joy.clickMode, "jpr_" + idx, "jsq_" + idx);
       html += clickMessagesHtml(idx,"j",joySeq,devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount);
@@ -743,18 +752,18 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
       html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div>";
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
-      html += "<div class='ang'><strong>" + String(tr("ToF Distance (mm)", "ToF距離 (mm)")) + "</strong>";
+      html += "<div class='ang'><strong>" + String(tr("ToF Distance (mm)", "ToF距離 (mm)")) + "</strong><div class='tof-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "fa_" + idx,
-                               devices[i].tof.addr);
-      html += "<label>" + String(tr("Deadband (mm)", "不感帯 (mm)")) + "</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'>";
-      html += "<label>" + String(tr("Maximum Distance (mm)", "最大距離 (mm)")) + "</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'>";
-      html += "<label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
+                               devices[i].tof.addr, "tof-address");
+      html += "<div><label>" + String(tr("Deadband (mm)", "不感帯 (mm)")) + "</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'></div>";
+      html += "<div><label>" + String(tr("Maximum Distance (mm)", "最大距離 (mm)")) + "</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'></div>";
+      html += "<div><label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
       html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Min / Far → Out Max", "近い → 出力最小値／遠い → 出力最大値")) + "</option>";
-      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Max / Far → Out Min", "近い → 出力最大値／遠い → 出力最小値")) + "</option></select>";
-      html += "<label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'>";
-      html += "<label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'>";
-      html += "<label>" + String(tr("Out Type", "出力の型")) + "</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType);
-      html += "<p class='note'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、最大距離未満です。範囲外ではOSC送信を停止します。")) + "</p></div>";
+      html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Max / Far → Out Min", "近い → 出力最大値／遠い → 出力最小値")) + "</option></select></div>";
+      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'></div>";
+      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'></div>";
+      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType) + "</div>";
+      html += "<p class='note tof-address'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、最大距離未満です。範囲外ではOSC送信を停止します。")) + "</p></div></div>";
     } else {
       html += "<p class='note'>Type code: " + String((int)devices[i].type) + "</p>";
     }
@@ -784,7 +793,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     html += "<button class='btn-warning' type='submit'>" + String(tr("Delete Settings", "設定を削除")) + "</button></form></div>";
     if (!flushHtml("SAVED_DEVICE_SENT")) return;
   }
-  html += "</body></html>";
+  html += "</main></body></html>";
   if (!flushHtml("FOOTER_SENT")) return;
   if (server.client().connected()) {
     uint32_t finalStarted = millis();
