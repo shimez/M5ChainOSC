@@ -6,6 +6,6 @@
   <text x="92" y="276" fill="#f8fafc" font-family="Segoe UI, Arial, sans-serif" font-size="86" font-weight="750" letter-spacing="-3">M5ChainOSC</text>
   <text x="96" y="337" fill="#bcb0f7" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="650" letter-spacing="4">DISPLAY + CHAIN DEVICES</text>
   <text x="96" y="416" fill="#dce4f1" font-family="Segoe UI, Arial, sans-serif" font-size="31">Browser-configurable OSC controller for AtomS3R</text>
-  <g transform="translate(850 335)"><rect width="215" height="145" rx="28" fill="#171e31" stroke="#6e5ed0" stroke-width="3"/><rect x="25" y="23" width="165" height="92" rx="15" fill="#0a1020" stroke="#9674ff"/><circle cx="107" cy="69" r="19" fill="#9674ff"/><path d="M50 132h115" stroke="#5c6680" stroke-width="8" stroke-linecap="round"/></g>
+  <g transform="translate(850 300)"><rect width="215" height="215" rx="32" fill="#171e31" stroke="#6e5ed0" stroke-width="3"/><rect x="25" y="25" width="165" height="165" rx="20" fill="#0a1020" stroke="#9674ff"/><circle cx="107" cy="107" r="22" fill="#9674ff"/></g>
   <text x="1105" y="538" text-anchor="end" fill="#818da2" font-family="Segoe UI, Arial, sans-serif" font-size="19">shimez.github.io/M5ChainOSC</text>
 </svg>
