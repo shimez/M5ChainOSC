@@ -27,9 +27,9 @@ void startAPMode() {
 
   const char* trackedHeaders[] = {"Accept-Language"};
   server.collectHeaders(trackedHeaders, 1);
-  server.on("/", handleAPRoot);
+  server.on("/", HTTP_GET, handleAPRoot);
   server.on("/set_language", HTTP_POST, handleSetLanguage);
-  server.on("/save_wifi", handleSaveWiFi);
+  server.on("/save_wifi", HTTP_POST, handleSaveWiFi);
   server.onNotFound([]() { handleAPRoot(); });
   server.begin();
 

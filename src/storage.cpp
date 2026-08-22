@@ -43,6 +43,15 @@ String deviceNameKeyLegacy(const String& uid) {
   return String("nm") + tail;
 }
 
+// Device-specific namespaces follow the ChainOSCmini design. The full UID is
+// also stored inside the value and checked on load; the hash is only the short
+// NVS namespace identifier required by the ESP32 15-character name limit.
+static String deviceStorageNamespace(const String& uid) {
+  char buf[12];
+  snprintf(buf, sizeof(buf), "s%08X", (unsigned)uidHash32(uid));
+  return String(buf);
+}
+
 // ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
@@ -257,6 +266,200 @@ static bool applyKeyMessages(ChainDevice& d, const String& blob) {
   return true;
 }
 
+static void appendMessageList(String& out, const OSCMessage* press,
+                              uint8_t pressCount, const OSCMessage* release,
+                              uint8_t releaseCount) {
+  appendField(out, (int)pressCount);
+  for (uint8_t i = 0; i < pressCount && i < MAX_KEY_OSC_MESSAGES; i++) {
+    appendField(out, press[i].address); appendField(out, press[i].valueStr);
+    appendField(out, (int)press[i].valueType);
+  }
+  appendField(out, (int)releaseCount);
+  for (uint8_t i = 0; i < releaseCount && i < MAX_KEY_OSC_MESSAGES; i++) {
+    appendField(out, release[i].address); appendField(out, release[i].valueStr);
+    appendField(out, (int)release[i].valueType);
+  }
+}
+
+static bool readMessageList(const String& blob, int& pos, OSCMessage* press,
+                            uint8_t& pressCount, OSCMessage* release,
+                            uint8_t& releaseCount) {
+  auto field = [&]() { return nextField(blob, pos); };
+  int pc = field().toInt();
+  if (pc < 0 || pc > MAX_KEY_OSC_MESSAGES) return false;
+  pressCount = (uint8_t)pc;
+  for (int i = 0; i < pc; i++) {
+    press[i].address = field(); press[i].valueStr = field();
+    int parsedType = field().toInt();
+    press[i].valueType = (ValueType)constrain(parsedType, (int)TYPE_FLOAT, (int)TYPE_STRING);
+    if (!plausibleOscAddress(press[i].address)) return false;
+  }
+  int rc = field().toInt();
+  if (rc < 0 || pc + rc > MAX_KEY_OSC_MESSAGES) return false;
+  releaseCount = (uint8_t)rc;
+  for (int i = 0; i < rc; i++) {
+    release[i].address = field(); release[i].valueStr = field();
+    int parsedType = field().toInt();
+    release[i].valueType = (ValueType)constrain(parsedType, (int)TYPE_FLOAT, (int)TYPE_STRING);
+    if (!plausibleOscAddress(release[i].address)) return false;
+  }
+  return true;
+}
+
+// D1 stores only fields used by the actual device type. This avoids the old
+// all-device blob, where every Key also consumed space for Encoder, Angle,
+// Joystick and ToF defaults.
+static String serializeTypedDeviceConfig(const ChainDevice& d) {
+  String out;
+  out.reserve(256);
+  appendField(out, String("D1")); appendField(out, d.uid);
+  appendField(out, (int)d.type); appendField(out, d.displayName);
+  if (d.type == CHAIN_KEY_TYPE_CODE) {
+    appendField(out, (int)d.mode); appendField(out, d.seq.address);
+    appendField(out, (int)d.seq.valueType); appendField(out, d.seq.start);
+    appendField(out, d.seq.end); appendField(out, d.seq.step);
+    appendMessageList(out, d.pressMessages, d.pressMessageCount, d.releaseMessages, d.releaseMessageCount);
+  } else if (d.type == CHAIN_ENCODER_TYPE_CODE) {
+    appendField(out, d.enc.rotAddr); appendField(out, d.enc.sendIncrement ? 1 : 0);
+    appendField(out, d.enc.absInMin); appendField(out, d.enc.absInMax); appendField(out, d.enc.incScale);
+    appendField(out, d.enc.map.outMin); appendField(out, d.enc.map.outMax); appendField(out, (int)d.enc.map.outType);
+    appendField(out, (int)d.enc.clickMode); appendField(out, d.enc.clickSeq.address);
+    appendField(out, (int)d.enc.clickSeq.valueType); appendField(out, d.enc.clickSeq.start);
+    appendField(out, d.enc.clickSeq.end); appendField(out, d.enc.clickSeq.step);
+    appendMessageList(out, d.enc.pressMessages, d.enc.pressMessageCount, d.enc.releaseMessages, d.enc.releaseMessageCount);
+  } else if (d.type == CHAIN_ANGLE_TYPE_CODE) {
+    appendField(out, d.angle.addr); appendField(out, d.angle.use12bit ? 1 : 0);
+    appendField(out, d.angle.deadband); appendField(out, d.angle.map.outMin);
+    appendField(out, d.angle.map.outMax); appendField(out, (int)d.angle.map.outType);
+  } else if (d.type == CHAIN_JOYSTICK_TYPE_CODE) {
+    appendField(out, d.joy.xAddr); appendField(out, d.joy.yAddr); appendField(out, d.joy.deadband);
+    appendField(out, d.joy.invertX ? 1 : 0); appendField(out, d.joy.invertY ? 1 : 0);
+    appendField(out, d.joy.map.outMin); appendField(out, d.joy.map.outMax); appendField(out, (int)d.joy.map.outType);
+    appendField(out, (int)d.joy.clickMode); appendField(out, d.joy.clickSeq.address);
+    appendField(out, (int)d.joy.clickSeq.valueType); appendField(out, d.joy.clickSeq.start);
+    appendField(out, d.joy.clickSeq.end); appendField(out, d.joy.clickSeq.step);
+    appendMessageList(out, d.joy.pressMessages, d.joy.pressMessageCount, d.joy.releaseMessages, d.joy.releaseMessageCount);
+  } else if (d.type == CHAIN_TOF_TYPE_CODE) {
+    appendField(out, d.tof.addr); appendField(out, d.tof.deadband);
+    appendField(out, d.tof.map.outMin); appendField(out, d.tof.map.outMax);
+    appendField(out, (int)(d.tof.map.outType == TYPE_INT ? TYPE_INT : TYPE_FLOAT)); appendField(out, d.tof.maxDistanceMm);
+    appendField(out, d.tof.nearValueHigh ? 1 : 0);
+  }
+  return out;
+}
+
+static bool applyTypedDeviceConfig(ChainDevice& d, const String& blob) {
+  if (!blob.length()) return false;
+  ChainDevice& candidate = d;
+  int pos = 0;
+  auto field = [&]() { return nextField(blob, pos); };
+  if (field() != "D1" || field() != d.uid) return false;
+  chain_device_type_t storedType = (chain_device_type_t)field().toInt();
+  if (storedType != d.type && d.type != CHAIN_UNKNOWN_TYPE_CODE) return false;
+  candidate.type = storedType; candidate.displayName = field();
+  if (candidate.displayName.length() > MAX_DEVICE_NAME_BYTES) return false;
+  if (storedType == CHAIN_KEY_TYPE_CODE) {
+    candidate.mode = field().toInt() == MODE_SEQUENCE ? MODE_SEQUENCE : MODE_PRESS_RELEASE;
+    candidate.seq.address = field();
+    int sequenceType = field().toInt();
+    candidate.seq.valueType = sequenceType >= TYPE_FLOAT && sequenceType <= TYPE_STRING ? (ValueType)sequenceType : TYPE_FLOAT;
+    candidate.seq.start = field().toFloat(); candidate.seq.end = field().toFloat(); candidate.seq.step = field().toFloat();
+    if (!plausibleOscAddress(candidate.seq.address) ||
+        !readMessageList(blob, pos, candidate.pressMessages, candidate.pressMessageCount, candidate.releaseMessages, candidate.releaseMessageCount)) return false;
+    if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
+    if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
+    normalizeSequence(candidate.seq);
+  } else if (storedType == CHAIN_ENCODER_TYPE_CODE) {
+    candidate.enc.rotAddr = field(); candidate.enc.sendIncrement = field().toInt() != 0;
+    candidate.enc.absInMin = field().toFloat(); candidate.enc.absInMax = field().toFloat(); candidate.enc.incScale = field().toFloat();
+    candidate.enc.map.outMin = field().toFloat(); candidate.enc.map.outMax = field().toFloat();
+    int encoderOutputType = field().toInt();
+    candidate.enc.map.outType = (ValueType)constrain(encoderOutputType, 0, 2);
+    candidate.enc.clickMode = field().toInt() == MODE_SEQUENCE ? MODE_SEQUENCE : MODE_PRESS_RELEASE;
+    candidate.enc.clickSeq.address = field();
+    int encoderSequenceType = field().toInt();
+    candidate.enc.clickSeq.valueType = encoderSequenceType >= TYPE_FLOAT && encoderSequenceType <= TYPE_STRING ? (ValueType)encoderSequenceType : TYPE_FLOAT;
+    candidate.enc.clickSeq.start = field().toFloat(); candidate.enc.clickSeq.end = field().toFloat(); candidate.enc.clickSeq.step = field().toFloat();
+    if (!plausibleOscAddress(candidate.enc.rotAddr) || !plausibleOscAddress(candidate.enc.clickSeq.address) ||
+        !readMessageList(blob, pos, candidate.enc.pressMessages, candidate.enc.pressMessageCount, candidate.enc.releaseMessages, candidate.enc.releaseMessageCount)) return false;
+    if (candidate.enc.pressMessageCount) candidate.enc.press = candidate.enc.pressMessages[0];
+    if (candidate.enc.releaseMessageCount) candidate.enc.release = candidate.enc.releaseMessages[0];
+    normalizeSequence(candidate.enc.clickSeq);
+  } else if (storedType == CHAIN_ANGLE_TYPE_CODE) {
+    candidate.angle.addr = field(); candidate.angle.use12bit = field().toInt() != 0;
+    candidate.angle.deadband = field().toInt(); candidate.angle.map.outMin = field().toFloat();
+    candidate.angle.map.outMax = field().toFloat();
+    int angleOutputType = field().toInt();
+    candidate.angle.map.outType = (ValueType)constrain(angleOutputType, 0, 2);
+    if (!plausibleOscAddress(candidate.angle.addr)) return false;
+  } else if (storedType == CHAIN_JOYSTICK_TYPE_CODE) {
+    candidate.joy.xAddr = field(); candidate.joy.yAddr = field(); candidate.joy.deadband = field().toInt();
+    candidate.joy.invertX = field().toInt() != 0; candidate.joy.invertY = field().toInt() != 0;
+    candidate.joy.map.outMin = field().toFloat(); candidate.joy.map.outMax = field().toFloat();
+    int joystickOutputType = field().toInt();
+    candidate.joy.map.outType = (ValueType)constrain(joystickOutputType, 0, 2);
+    candidate.joy.clickMode = field().toInt() == MODE_SEQUENCE ? MODE_SEQUENCE : MODE_PRESS_RELEASE;
+    candidate.joy.clickSeq.address = field();
+    int joystickSequenceType = field().toInt();
+    candidate.joy.clickSeq.valueType = joystickSequenceType >= TYPE_FLOAT && joystickSequenceType <= TYPE_STRING ? (ValueType)joystickSequenceType : TYPE_FLOAT;
+    candidate.joy.clickSeq.start = field().toFloat(); candidate.joy.clickSeq.end = field().toFloat(); candidate.joy.clickSeq.step = field().toFloat();
+    if (!plausibleOscAddress(candidate.joy.xAddr) || !plausibleOscAddress(candidate.joy.yAddr) || !plausibleOscAddress(candidate.joy.clickSeq.address) ||
+        !readMessageList(blob, pos, candidate.joy.pressMessages, candidate.joy.pressMessageCount, candidate.joy.releaseMessages, candidate.joy.releaseMessageCount)) return false;
+    if (candidate.joy.pressMessageCount) candidate.joy.press = candidate.joy.pressMessages[0];
+    if (candidate.joy.releaseMessageCount) candidate.joy.release = candidate.joy.releaseMessages[0];
+    normalizeSequence(candidate.joy.clickSeq);
+  } else if (storedType == CHAIN_TOF_TYPE_CODE) {
+    candidate.tof.addr = field(); candidate.tof.deadband = field().toInt();
+    candidate.tof.map.outMin = field().toFloat(); candidate.tof.map.outMax = field().toFloat();
+    candidate.tof.map.outType = field().toInt() == TYPE_INT ? TYPE_INT : TYPE_FLOAT;
+    int maxDistanceMm = field().toInt();
+    candidate.tof.maxDistanceMm = constrain(maxDistanceMm, 31, 2000);
+    candidate.tof.nearValueHigh = field().toInt() != 0;
+    if (!plausibleOscAddress(candidate.tof.addr)) return false;
+  } else return false;
+  candidate.angle.map.inMin = 0; candidate.angle.map.inMax = candidate.angle.use12bit ? 4095.f : 255.f;
+  candidate.enc.map.inMin = candidate.enc.absInMin; candidate.enc.map.inMax = candidate.enc.absInMax;
+  candidate.joy.map.inMin = -127; candidate.joy.map.inMax = 127;
+  candidate.tof.map.inMin = 30; candidate.tof.map.inMax = candidate.tof.maxDistanceMm;
+  return true;
+}
+
+static bool loadTypedDeviceConfig(ChainDevice& d) {
+  Preferences direct;
+  String ns = deviceStorageNamespace(d.uid);
+  if (!direct.begin(ns.c_str(), true)) return false;
+  String blob = direct.getString("cfg", ""); direct.end();
+  bool ok = applyTypedDeviceConfig(d, blob);
+  STORAGE_LOG("LOAD typed: uid=%s ns=%s len=%u ok=%d", d.uid.c_str(), ns.c_str(), (unsigned)blob.length(), ok ? 1 : 0);
+  if (ok && d.type == CHAIN_KEY_TYPE_CODE)
+    STORAGE_LOG("LOAD typed key: uid=%s mode=%d press=%u release=%u sequence=%s",
+                d.uid.c_str(), (int)d.mode, d.pressMessageCount,
+                d.releaseMessageCount, d.seq.address.c_str());
+  else if (ok && d.type == CHAIN_ENCODER_TYPE_CODE)
+    STORAGE_LOG("LOAD typed encoder: uid=%s rotation=%s", d.uid.c_str(), d.enc.rotAddr.c_str());
+  else if (ok && d.type == CHAIN_ANGLE_TYPE_CODE)
+    STORAGE_LOG("LOAD typed angle: uid=%s address=%s", d.uid.c_str(), d.angle.addr.c_str());
+  else if (ok && d.type == CHAIN_JOYSTICK_TYPE_CODE)
+    STORAGE_LOG("LOAD typed joystick: uid=%s x=%s y=%s", d.uid.c_str(), d.joy.xAddr.c_str(), d.joy.yAddr.c_str());
+  else if (ok && d.type == CHAIN_TOF_TYPE_CODE)
+    STORAGE_LOG("LOAD typed tof: uid=%s address=%s", d.uid.c_str(), d.tof.addr.c_str());
+  return ok;
+}
+
+static bool saveTypedDeviceConfig(const ChainDevice& d) {
+  String blob = serializeTypedDeviceConfig(d);
+  if (!blob.length() || blob.length() > MAX_DEVICE_CONFIG_BYTES) return false;
+  Preferences direct;
+  String ns = deviceStorageNamespace(d.uid);
+  if (!direct.begin(ns.c_str(), false)) return false;
+  direct.clear(); size_t wrote = direct.putString("cfg", blob); direct.end();
+  if (!direct.begin(ns.c_str(), true)) return false;
+  String verify = direct.getString("cfg", ""); direct.end();
+  bool ok = wrote == blob.length() && verify == blob;
+  STORAGE_LOG("SAVE typed: uid=%s ns=%s len=%u wrote=%u ok=%d", d.uid.c_str(), ns.c_str(), (unsigned)blob.length(), (unsigned)wrote, ok ? 1 : 0);
+  return ok;
+}
+
 String serializeDeviceConfig(const ChainDevice& d) {
   String o;
   appendField(o, (int)d.type);
@@ -291,7 +494,7 @@ String serializeDeviceConfig(const ChainDevice& d) {
   appendField(o, d.tof.addr);
   appendField(o, d.tof.deadband);
   appendField(o, d.tof.map.outMin); appendField(o, d.tof.map.outMax);
-  appendField(o, (int)d.tof.map.outType);
+  appendField(o, (int)(d.tof.map.outType == TYPE_INT ? TYPE_INT : TYPE_FLOAT));
   appendField(o, d.tof.maxDistanceMm);
   appendField(o, d.tof.nearValueHigh ? 1 : 0);
 
@@ -299,9 +502,7 @@ String serializeDeviceConfig(const ChainDevice& d) {
 }
 
 size_t deviceConfigStorageBytes(const ChainDevice& d) {
-  size_t bytes = serializeDeviceConfig(d).length();
-  if (d.type == CHAIN_KEY_TYPE_CODE || d.type == CHAIN_ENCODER_TYPE_CODE || d.type == CHAIN_JOYSTICK_TYPE_CODE) bytes += serializeKeyMessages(d).length();
-  return bytes;
+  return serializeTypedDeviceConfig(d).length();
 }
 
 void applySerializedConfig(ChainDevice& d, const String& blob) {
@@ -378,7 +579,7 @@ void applySerializedConfig(ChainDevice& d, const String& blob) {
       d.tof.deadband = asInt();
       d.tof.map.outMin = asFloat();
       d.tof.map.outMax = asFloat();
-      d.tof.map.outType = (ValueType)asInt();
+      d.tof.map.outType = asInt() == TYPE_INT ? TYPE_INT : TYPE_FLOAT;
       String maxDistance = s();
       if (maxDistance.length()) d.tof.maxDistanceMm = constrain(maxDistance.toInt(), 31, 2000);
       String nearValueHigh = s();
@@ -455,6 +656,12 @@ void loadDeviceSettings(ChainDevice& d) {
   d.type = liveType;
   if (!d.uid.length() || isPlaceholderUid(d.uid)) return;
 
+  // New compact format first. The old shared namespaces remain a read-only
+  // fallback and are migrated on the next successful save.
+  if (loadTypedDeviceConfig(d)) return;
+  setDefaultDeviceMessages(d);
+  d.type = liveType;
+
   String dedicatedName = loadDeviceNameOnly(d.uid);
   String keyNew = deviceCfgKey(d.uid);
   String keyOld = deviceCfgKeyLegacy(d.uid);
@@ -524,6 +731,7 @@ void loadDeviceSettings(ChainDevice& d) {
   d.tof.map.inMin = 30;
   d.tof.maxDistanceMm = constrain(d.tof.maxDistanceMm, 31, 2000);
   d.tof.map.inMax = d.tof.maxDistanceMm;
+  d.tof.map.outType = d.tof.map.outType == TYPE_INT ? TYPE_INT : TYPE_FLOAT;
 }
 
 bool saveDeviceSettings(const ChainDevice& d) {
@@ -531,61 +739,32 @@ bool saveDeviceSettings(const ChainDevice& d) {
     STORAGE_LOG("SAVE rejected placeholder: uid=%s", d.uid.c_str());
     return false;
   }
-  saveDeviceNameOnly(d.uid, d.displayName);
-
-  String key    = deviceCfgKey(d.uid);
-  String keyOld = deviceCfgKeyLegacy(d.uid);
-  String blob   = serializeDeviceConfig(d);
-  STORAGE_LOG("SAVE begin: uid=%s type=%d key=%s baseLen=%u press=%u release=%u", d.uid.c_str(), (int)d.type, key.c_str(), (unsigned)blob.length(), d.pressMessageCount, d.releaseMessageCount);
-
-  auto tryWrite = [&](bool clearOldNs) -> bool {
-    if (clearOldNs) {
-      Preferences p2;
-      if (p2.begin("keycfg", false)) {
-        p2.clear();
-        p2.end();
-      }
-    }
-    if (!prefs.begin("devcfg", false)) {
-      STORAGE_LOG("SAVE devcfg begin failed: uid=%s", d.uid.c_str());
-      return false;
-    }
-    prefs.remove(keyOld.c_str());
-    prefs.remove(key.c_str());
-    size_t wrote = prefs.putBytes(key.c_str(), blob.c_str(), blob.length());
-    if (wrote != blob.length()) {
-      prefs.remove(key.c_str());
-      wrote = prefs.putString(key.c_str(), blob);
-    }
-    size_t len2 = prefs.getBytesLength(key.c_str());
-    bool ok = (len2 == blob.length()) ||
-              (prefs.getString(key.c_str(), "").length() == (int)blob.length());
-    prefs.end();
-    STORAGE_LOG("SAVE base result: uid=%s wrote=%u storedLen=%u expected=%u ok=%d", d.uid.c_str(), (unsigned)wrote, (unsigned)len2, (unsigned)blob.length(), ok ? 1 : 0);
-    return ok;
-  };
-
-  bool ok = tryWrite(false) || tryWrite(true);
-  if (ok && (d.type == CHAIN_KEY_TYPE_CODE || d.type == CHAIN_ENCODER_TYPE_CODE || d.type == CHAIN_JOYSTICK_TYPE_CODE)) {
-    String multi = serializeKeyMessages(d);
-    if (!prefs.begin("keymulti", false)) {
-      STORAGE_LOG("SAVE keymulti begin failed: uid=%s", d.uid.c_str());
-      return false;
-    }
-    size_t wrote = prefs.putString(key.c_str(), multi);
-    String verify = prefs.getString(key.c_str(), "");
-    prefs.end();
-    ok = wrote > 0 && verify == multi;
-    STORAGE_LOG("SAVE keymulti result: uid=%s key=%s wrote=%u readLen=%u expected=%u match=%d", d.uid.c_str(), key.c_str(), (unsigned)wrote, (unsigned)verify.length(), (unsigned)multi.length(), ok ? 1 : 0);
+  if (!saveTypedDeviceConfig(d)) {
+    STORAGE_LOG("SAVE typed failed: uid=%s", d.uid.c_str());
+    return false;
   }
-  if (ok) registerKnownDevice(d.uid, d.displayName, d.type);
-  STORAGE_LOG("SAVE end: uid=%s ok=%d", d.uid.c_str(), ok ? 1 : 0);
-  return ok;
+
+  // Release old copies only after the new setting has been read back and
+  // verified. Existing firmware data therefore remains loadable until its
+  // first successful D1 save.
+  String migratedKey = deviceCfgKey(d.uid);
+  if (prefs.begin("devcfg", false)) {
+    prefs.remove(migratedKey.c_str()); prefs.remove(deviceCfgKeyLegacy(d.uid).c_str());
+    prefs.remove(deviceNameKey(d.uid).c_str()); prefs.remove(deviceNameKeyLegacy(d.uid).c_str());
+    prefs.end();
+  }
+  if (prefs.begin("keymulti", false)) { prefs.remove(migratedKey.c_str()); prefs.end(); }
+  registerKnownDevice(d.uid, d.displayName, d.type);
+  STORAGE_LOG("SAVE end: uid=%s ok=1 format=D1", d.uid.c_str());
+  return true;
 }
 
 void deleteDeviceSettingsByUid(const String& uid) {
   if (!uid.length()) return;
   if (!isPlaceholderUid(uid)) {
+    Preferences direct;
+    String directNs = deviceStorageNamespace(uid);
+    if (direct.begin(directNs.c_str(), false)) { direct.clear(); direct.end(); }
     const String cfgKey = deviceCfgKey(uid);
     const String nameKey = deviceNameKey(uid);
     const String legacyCfgKey = deviceCfgKeyLegacy(uid);
@@ -782,6 +961,12 @@ void resetAllSettings() {
   showResetProgress(RESET_HOLD_MS);
   delay(300);
   showMessage("RESET", "Clearing...");
+  for (int i = 0; i < MAX_KNOWN; i++) {
+    if (!knownDevices[i].used || !knownDevices[i].uid.length()) continue;
+    Preferences direct;
+    String ns = deviceStorageNamespace(knownDevices[i].uid);
+    if (direct.begin(ns.c_str(), false)) { direct.clear(); direct.end(); }
+  }
   prefs.begin("wifi", false); prefs.clear(); prefs.end();
   prefs.begin("osc", false); prefs.clear(); prefs.end();
   prefs.begin("devcfg", false); prefs.clear(); prefs.end();

@@ -1,6 +1,6 @@
 {
   "name": "M5ChainOSC",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "new_install_prompt_erase": true,
   "new_install_improv_wait_time": 0,
   "builds": [
@@ -9,7 +9,7 @@
       "improv": false,
       "parts": [
         {
-          "path": "firmware/M5ChainOSC-1.7.0-AtomS3R-merged.bin",
+          "path": "firmware/M5ChainOSC-1.8.0-AtomS3R-merged.bin",
           "offset": 0
         }
       ]

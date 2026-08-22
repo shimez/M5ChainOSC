@@ -13,8 +13,9 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 デスクトップ版のChromeまたはEdgeを使用してください。
 
-現在の正式版は`1.7.0`です。
+現在の正式版は`1.8.0`です。
 
+- Version 1.8.0: 保存済みデバイス上限を40件へ拡張し、省容量なデバイス別保存方式と旧設定互換、JSONインポートの互換性・結果表示を改善
 - Version 1.7.0: Wi-Fi切断後の自動再接続とOSC送信表示を改善し、Sequenceの検証・正規化・String送信をChainOSCminiと統一
 - Version 1.6.1: Encoder、Angle、ToF、JoystickのWeb UIをグリッド配置へ整理し、狭い画面での表示を改善
 - Version 1.6.0: デバイス単位プリセットをChainOSCminiと共通化し、旧M5ChainOSC形式のインポート互換性を維持
@@ -29,10 +30,10 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 ## ファームウェアの配置
 
-Web Installerには、GitHub ActionsでビルドしてGitHub Releaseへ添付したmergedバイナリを、Pages配信Workflowが自動的に組み込みます。Version 1.7.0では次のパスで配信します。
+Web Installerには、GitHub ActionsでビルドしてGitHub Releaseへ添付したmergedバイナリを、Pages配信Workflowが自動的に組み込みます。Version 1.8.0では次のパスで配信します。
 
 ```text
-installer/firmware/M5ChainOSC-1.7.0-AtomS3R-merged.bin
+installer/firmware/M5ChainOSC-1.8.0-AtomS3R-merged.bin
 ```
 
 `manifest.json`は、この同一オリジンのファイルをESP32-S3のoffset `0x0`へ書き込みます。GitHub Release AssetのURLはブラウザのCORS制限で取得できない場合があるため、ブラウザから直接参照せず、GitHub ActionsがPages成果物へコピーします。

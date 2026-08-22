@@ -6,6 +6,24 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.8.0]
+
+### Added
+
+- 保存済みデバイス設定の上限を16件から40件へ拡張
+- ChainOSCminiを参考に、デバイス種別ごとの省容量なNVS保存方式を追加
+
+### Changed
+
+- 設定変更を行うWeb UIのHTTPルートをPOSTへ統一
+- JSONインポート完了時に、新規追加・既存更新・保存上限による未追加件数を表示
+- 上限を超えるデバイス設定を含むJSONのエラーメッセージを具体化
+
+### Fixed
+
+- 従来のNVS形式および旧バージョンで出力したJSONを引き続き読み込めるよう互換性を改善
+- ToFおよびSequenceの旧設定値を正規化してインポートできるよう改善
+
 ## [1.7.0]
 
 ### Changed
@@ -148,7 +166,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.0
 [1.7.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.7.0
 [1.6.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.6.1
 [1.6.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.6.0

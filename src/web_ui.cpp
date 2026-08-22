@@ -239,8 +239,10 @@ static String messageJson(const OSCMessage& message) {
 static String messageArrayJson(const OSCMessage* messages,uint8_t count){String out="[";for(uint8_t i=0;i<count;i++){if(i)out+=',';out+=messageJson(messages[i]);}return out+"]";}
 
 static String sequenceJson(const SequenceConfig& sequence) {
+  ValueType valueType = sequence.valueType;
+  if (valueType < TYPE_FLOAT || valueType > TYPE_STRING) valueType = TYPE_FLOAT;
   return String("{\"address\":") + jsonString(sequence.address) +
-         ",\"type\":" + String((int)sequence.valueType) +
+         ",\"type\":" + String((int)valueType) +
          ",\"start\":" + String(sequence.start, 6) +
          ",\"end\":" + String(sequence.end, 6) +
          ",\"step\":" + String(sequence.step, 6) + "}";
@@ -250,6 +252,12 @@ static String rangeJson(const RangeMap& map) {
   return String("{\"outMin\":") + String(map.outMin, 6) +
          ",\"outMax\":" + String(map.outMax, 6) +
          ",\"type\":" + String((int)map.outType) + "}";
+}
+
+static String numericRangeJson(const RangeMap& map) {
+  RangeMap numericMap = map;
+  numericMap.outType = map.outType == TYPE_INT ? TYPE_INT : TYPE_FLOAT;
+  return rangeJson(numericMap);
 }
 
 static String deviceJson(const ChainDevice& device, bool includeIdentity = true) {
@@ -309,7 +317,7 @@ static String deviceJson(const ChainDevice& device, bool includeIdentity = true)
            ",\"deadband\":" + String(device.tof.deadband) +
            ",\"maxDistanceMm\":" + String(device.tof.maxDistanceMm) +
            ",\"nearValueHigh\":" + String(device.tof.nearValueHigh ? "true" : "false") +
-           ",\"range\":" + rangeJson(device.tof.map) + "}";
+           ",\"range\":" + numericRangeJson(device.tof.map) + "}";
   }
   out += '}';
   return out;
@@ -337,7 +345,10 @@ static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence, Strin
   sequence.address.trim();
   if (!validOscAddressText(sequence.address, error)) return false;
   int type = object["type"].as<int>();
-  if (type < TYPE_FLOAT || type > TYPE_STRING) { error = tr("Sequence values are invalid.", "シーケンスの値が正しくありません。"); return false; }
+  // Some settings exported by older M5ChainOSC builds contain a shifted,
+  // out-of-range Sequence type. Sequence values are numeric in that legacy
+  // data, so retain the values and migrate the unsupported type to Float.
+  if (type < TYPE_FLOAT || type > TYPE_STRING) type = TYPE_FLOAT;
   sequence.valueType = (ValueType)type;
   sequence.start = object["start"].as<float>();
   sequence.end = object["end"].as<float>();
@@ -439,9 +450,10 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device, String& 
       error = "ToF distance or deadband is out of range."; return false;
     }
     if (!jsonRange(v["range"].as<JsonObjectConst>(), device.tof.map, error)) return false;
-    if (device.tof.map.outType != TYPE_FLOAT && device.tof.map.outType != TYPE_INT) {
-      error = "ToF output type must be Float or Int."; return false;
-    }
+    // Older M5ChainOSC versions could export the legacy String type even
+    // though ToF output has always been numeric. Import it as Float so those
+    // files remain usable; new exports only contain Float or Int.
+    if (device.tof.map.outType == TYPE_STRING) device.tof.map.outType = TYPE_FLOAT;
     device.tof.map.inMin = 30;
     device.tof.map.inMax = device.tof.maxDistanceMm;
   } else { error = "Unsupported device type."; return false; }
@@ -455,12 +467,12 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device, String& 
 void registerWebRoutes() {
   const char* trackedHeaders[] = {"Accept-Language"};
   server.collectHeaders(trackedHeaders, 1);
-  server.on("/", handleRoot);
+  server.on("/", HTTP_GET, handleRoot);
   server.on("/set_language", HTTP_POST, handleSetLanguage);
-  server.on("/save", handleSave);
-  server.on("/delete_wifi", handleDeleteWifi);
-  server.on("/delete_device", handleDeleteDevice);
-  server.on("/set_rotation", handleSetRotation);
+  server.on("/save", HTTP_POST, handleSave);
+  server.on("/delete_wifi", HTTP_POST, handleDeleteWifi);
+  server.on("/delete_device", HTTP_POST, handleDeleteDevice);
+  server.on("/set_rotation", HTTP_POST, handleSetRotation);
   server.on("/export_settings", HTTP_GET, handleExportSettings);
   server.on("/import_settings", HTTP_POST, handleImportSettings);
   server.on("/export_device_preset", HTTP_GET, handleExportDevicePreset);
@@ -1229,9 +1241,18 @@ void handleImportSettings() {
   }
   JsonObjectConst global = root["global"].as<JsonObjectConst>();
   JsonArrayConst importedDevices = root["devices"].as<JsonArrayConst>();
-  if (global.isNull() || importedDevices.isNull() || importedDevices.size() > MAX_KNOWN ||
+  if (global.isNull() || importedDevices.isNull() ||
       !global["oscHost"].is<const char*>() || !global["oscPort"].is<int>() || !global["displayRotation"].is<int>()) {
     server.send(400, "text/plain; charset=utf-8", tr("Global settings or device list is invalid.", "共通設定またはデバイス一覧が正しくありません。")); return;
+  }
+  if (importedDevices.size() > MAX_KNOWN) {
+    String message = String(tr("A maximum of ", "インポートできるデバイス設定は最大")) +
+                     String(MAX_KNOWN) +
+                     String(tr(" device settings can be imported. The selected file contains ",
+                               "件です。選択したファイルには")) +
+                     String((unsigned)importedDevices.size()) +
+                     String(tr(".", "件含まれています。"));
+    server.send(400, "text/plain; charset=utf-8", message); return;
   }
   String importedHost = global["oscHost"].as<const char*>();
   int importedPort = global["oscPort"].as<int>();
@@ -1271,12 +1292,26 @@ void handleImportSettings() {
   }
 
   deviceNumber = 0;
+  int addedDeviceCount = 0;
+  int updatedDeviceCount = 0;
+  int skippedDeviceCount = 0;
   for (JsonObjectConst object : importedDevices) {
     deviceNumber++;
-    if (!deviceFromJson(object, *candidate, validationError) || !saveDeviceSettings(*candidate)) {
+    if (!deviceFromJson(object, *candidate, validationError)) {
       delete candidate;
       server.send(507, "text/plain; charset=utf-8", String(tr("Storage write failed at device ", "デバイス設定のストレージ書き込みに失敗しました: ")) + String(deviceNumber) + "."); return;
     }
+    bool alreadyKnown = findKnownIndex(candidate->uid) >= 0;
+    if (!alreadyKnown && knownCount >= MAX_KNOWN) {
+      skippedDeviceCount++;
+      continue;
+    }
+    if (!saveDeviceSettings(*candidate)) {
+      delete candidate;
+      server.send(507, "text/plain; charset=utf-8", String(tr("Storage write failed at device ", "デバイス設定のストレージ書き込みに失敗しました: ")) + String(deviceNumber) + "."); return;
+    }
+    if (alreadyKnown) updatedDeviceCount++;
+    else addedDeviceCount++;
     MEMORY_DEBUG_JSON("IMPORT_DEVICE_SAVED", 0, document);
   }
   delete candidate;
@@ -1293,5 +1328,12 @@ void handleImportSettings() {
   refreshChainDevices(true);
   if (!isAPMode && !resetInProgress) drawMainScreen();
   MEMORY_DEBUG_JSON("IMPORT_END", 0, document);
-  server.send(200, "text/plain; charset=utf-8", String(tr("Import completed. ", "インポートが完了しました。")) + String(importedDevices.size()) + tr(" device(s) restored.", "件のデバイス設定を復元しました。"));
+  String result = String(tr("Import completed. Added: ", "インポートが完了しました。新規追加: ")) +
+                  String(addedDeviceCount) +
+                  String(tr(", updated: ", "件、既存更新: ")) +
+                  String(updatedDeviceCount) +
+                  String(tr(", skipped due to the saved-device limit: ", "件、保存上限により未追加: ")) +
+                  String(skippedDeviceCount) +
+                  String(tr(".", "件。"));
+  server.send(200, "text/plain; charset=utf-8", result);
 }
