@@ -6,6 +6,15 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.7.0]
+
+### Changed
+
+- 動作中のWi-Fi切断を検出し、保存済みアクセスポイントへ自動的に再接続するよう改善
+- Wi-Fi切断中はOSC送信フィードバックを表示せず、Sequenceの現在値も進めないよう改善
+- Sequenceの数値検証と増減方向の正規化をChainOSCminiと統一
+- SequenceのString型で数値を文字列化して送信するよう修正
+
 ## [1.6.1]
 
 ### Changed
@@ -139,7 +148,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.6.1...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.7.0
 [1.6.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.6.1
 [1.6.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.6.0
 [1.5.3]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.5.3

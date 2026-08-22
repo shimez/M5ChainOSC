@@ -107,7 +107,9 @@ String deviceDisplayName(const ChainDevice& d) {
 }
 
 void normalizeSequence(SequenceConfig& s) {
-  if (s.step == 0) s.step = 1;
+  if (!isfinite(s.start)) s.start = 0;
+  if (!isfinite(s.end)) s.end = 10;
+  if (!isfinite(s.step) || fabsf(s.step) < 1e-9f) s.step = 1;
   if (s.start <= s.end && s.step < 0) s.step = -s.step;
   if (s.start > s.end && s.step > 0) s.step = -s.step;
   s.current = s.start;

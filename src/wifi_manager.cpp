@@ -3,6 +3,19 @@
 #include "display.h"
 #include "web_ui.h"
 
+namespace {
+constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 5000;
+bool stationConnected = false;
+bool mdnsRunning = false;
+unsigned long lastReconnectAttemptMs = 0;
+
+void startMdns() {
+  if (mdnsRunning) MDNS.end();
+  mdnsRunning = MDNS.begin("atoms3r-osc");
+  hostStr = mdnsRunning ? "atoms3r-osc.local" : "(mDNS fail)";
+}
+}  // namespace
+
 void startAPMode() {
   isAPMode = true;
   IPAddress apIP(192, 168, 4, 1);
@@ -34,11 +47,9 @@ void connectOrStartAP() {
 
   if (WiFi.status() == WL_CONNECTED) {
     isAPMode = false;
+    stationConnected = true;
     ipStr = WiFi.localIP().toString();
-    if (MDNS.begin("atoms3r-osc"))
-      hostStr = "atoms3r-osc.local";
-    else
-      hostStr = "(mDNS fail)";
+    startMdns();
 
     registerWebRoutes();
     server.begin();
@@ -50,5 +61,40 @@ void connectOrStartAP() {
 }
 
 void handleWifiLoop() {
-  if (isAPMode) dnsServer.processNextRequest();
+  if (isAPMode) {
+    dnsServer.processNextRequest();
+    return;
+  }
+
+  const bool connected = WiFi.status() == WL_CONNECTED;
+  const unsigned long now = millis();
+
+  if (connected) {
+    if (!stationConnected) {
+      stationConnected = true;
+      lastReconnectAttemptMs = 0;
+      ipStr = WiFi.localIP().toString();
+      startMdns();
+      drawMainScreen();
+    }
+    return;
+  }
+
+  if (stationConnected) {
+    stationConnected = false;
+    if (mdnsRunning) {
+      MDNS.end();
+      mdnsRunning = false;
+    }
+    showMessage("WiFi", "Reconnecting");
+    WiFi.reconnect();
+    lastReconnectAttemptMs = now;
+    return;
+  }
+
+  if (lastReconnectAttemptMs == 0 ||
+      now - lastReconnectAttemptMs >= WIFI_RECONNECT_INTERVAL_MS) {
+    WiFi.reconnect();
+    lastReconnectAttemptMs = now;
+  }
 }

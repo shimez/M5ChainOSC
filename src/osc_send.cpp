@@ -2,41 +2,47 @@
 #include "globals.h"
 #include "display.h"
 
-void sendOSCValue(const String& address, ValueType type, float value, const String& strValue) {
-  if (WiFi.status() != WL_CONNECTED || !address.length()) return;
+bool sendOSCValue(const String& address, ValueType type, float value, const String& strValue) {
+  if (WiFi.status() != WL_CONNECTED || !address.length()) return false;
   if (type == TYPE_FLOAT)
     OscWiFi.send(osc_host.c_str(), osc_port, address.c_str(), value);
   else if (type == TYPE_INT)
     OscWiFi.send(osc_host.c_str(), osc_port, address.c_str(), (int)lroundf(value));
   else
     OscWiFi.send(osc_host.c_str(), osc_port, address.c_str(), strValue.c_str());
+  return true;
 }
 
-void sendOSC(const OSCMessage& m) {
+bool sendOSC(const OSCMessage& m) {
   if (m.valueType == TYPE_STRING)
-    sendOSCValue(m.address, TYPE_STRING, 0, m.valueStr);
+    return sendOSCValue(m.address, TYPE_STRING, 0, m.valueStr);
   else if (m.valueType == TYPE_INT)
-    sendOSCValue(m.address, TYPE_INT, (float)m.valueStr.toInt());
-  else
-    sendOSCValue(m.address, TYPE_FLOAT, m.valueStr.toFloat());
+    return sendOSCValue(m.address, TYPE_INT, (float)m.valueStr.toInt());
+  return sendOSCValue(m.address, TYPE_FLOAT, m.valueStr.toFloat());
 }
 
 void sendMappedOsc(const String& name, const String& addr, float mapped, ValueType type) {
   String valueText =
       (type == TYPE_INT) ? String((int)lroundf(mapped)) : String(mapped, 3);
 
+  bool sent = false;
   if (type == TYPE_STRING) {
     // Numeric sensors may still select String in older configs — send the number as text
-    sendOSCValue(addr, TYPE_STRING, 0, valueText);
+    sent = sendOSCValue(addr, TYPE_STRING, 0, valueText);
   } else {
-    sendOSCValue(addr, type, mapped);
+    sent = sendOSCValue(addr, type, mapped);
   }
-  showOscFeedback(name, addr, valueText);
+  if (sent) showOscFeedback(name, addr, valueText);
 }
 
 void handleSequencePress(SequenceConfig& seq, const String& name) {
   float v = seq.current;
-  sendOSCValue(seq.address, seq.valueType, v);
+  const String valueText = seq.valueType == TYPE_INT
+                               ? String((int)lroundf(v))
+                               : String(v, 3);
+  if (!sendOSCValue(seq.address, seq.valueType, v,
+                    seq.valueType == TYPE_STRING ? valueText : ""))
+    return;
   float next = v + seq.step;
   if (seq.step >= 0) {
     if (next > seq.end + 1e-6f) next = seq.start;
@@ -44,6 +50,5 @@ void handleSequencePress(SequenceConfig& seq, const String& name) {
     if (next < seq.end - 1e-6f) next = seq.start;
   }
   seq.current = next;
-  showOscFeedback(name, seq.address,
-                  seq.valueType == TYPE_INT ? String((int)v) : String(v, 2));
+  showOscFeedback(name, seq.address, valueText);
 }

@@ -171,6 +171,36 @@ static bool validOscMessage(const OSCMessage& m, String& error) {
   return true;
 }
 
+static bool parseFiniteFloatArg(const String& name, float& value) {
+  if (!server.hasArg(name)) return false;
+  const String text = server.arg(name);
+  char* end = nullptr;
+  value = strtof(text.c_str(), &end);
+  return end && end != text.c_str() && *end == '\0' && isfinite(value);
+}
+
+static bool parseSequenceForm(const String& addressName,
+                              const String& startName,
+                              const String& endName,
+                              const String& stepName,
+                              const String& typeName,
+                              SequenceConfig& sequence, String& error) {
+  sequence.address = server.arg(addressName);
+  sequence.address.trim();
+  if (!validOscAddressText(sequence.address, error)) return false;
+  if (!parseFiniteFloatArg(startName, sequence.start) ||
+      !parseFiniteFloatArg(endName, sequence.end) ||
+      !parseFiniteFloatArg(stepName, sequence.step)) {
+    error = tr("Sequence values are invalid.",
+               "シーケンスの値が正しくありません。");
+    return false;
+  }
+  sequence.valueType = (ValueType)constrain(
+      server.arg(typeName).toInt(), (int)TYPE_FLOAT, (int)TYPE_STRING);
+  normalizeSequence(sequence);
+  return true;
+}
+
 static bool parseMessageList(const String& idx,const String& prefix,OSCMessage* press,uint8_t& pc,OSCMessage* release,uint8_t& rc,String& error){
   int p=constrain(server.arg(prefix+"pc_"+idx).toInt(),0,MAX_KEY_OSC_MESSAGES),r=constrain(server.arg(prefix+"rc_"+idx).toInt(),0,MAX_KEY_OSC_MESSAGES);
   if(p+r>MAX_KEY_OSC_MESSAGES){error=tr("Press and Release messages must total 8 or fewer.","PressとReleaseのメッセージは合計8件以内にしてください。");return false;}
@@ -301,19 +331,19 @@ static bool jsonMessageArrays(JsonVariantConst pv,JsonVariantConst rv,OSCMessage
 static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence, String& error) {
   if (object.isNull() || !object["address"].is<const char*>() || !object["type"].is<int>() ||
       !object.containsKey("start") || !object.containsKey("end") || !object.containsKey("step")) {
-    error = "Sequence has missing or invalid fields."; return false;
+    error = tr("Sequence fields are missing.", "シーケンスの必須項目がありません。"); return false;
   }
   sequence.address = object["address"].as<const char*>();
   sequence.address.trim();
   if (!validOscAddressText(sequence.address, error)) return false;
   int type = object["type"].as<int>();
-  if (type < TYPE_FLOAT || type > TYPE_STRING) { error = "Sequence type is invalid."; return false; }
+  if (type < TYPE_FLOAT || type > TYPE_STRING) { error = tr("Sequence values are invalid.", "シーケンスの値が正しくありません。"); return false; }
   sequence.valueType = (ValueType)type;
   sequence.start = object["start"].as<float>();
   sequence.end = object["end"].as<float>();
   sequence.step = object["step"].as<float>();
   if (!isfinite(sequence.start) || !isfinite(sequence.end) || !isfinite(sequence.step)) {
-    error = "Sequence contains a non-finite number."; return false;
+    error = tr("Sequence values are invalid.", "シーケンスの値が正しくありません。"); return false;
   }
   normalizeSequence(sequence);
   return true;
@@ -867,16 +897,11 @@ void handleSave() {
       }
       if (pc > 0) candidate.press = candidate.pressMessages[0];
       if (rc > 0) candidate.release = candidate.releaseMessages[0];
-      if (server.hasArg("sa_" + idx)) candidate.seq.address = server.arg("sa_" + idx);
-      candidate.seq.address.trim();
-      if (!validOscAddressText(candidate.seq.address, validationError)) {
-        sendUiResult(400, tr("Save error", "保存エラー"), String("Sequence: ") + validationError); return;
+      if (!parseSequenceForm("sa_" + idx, "ss_" + idx, "se_" + idx,
+                             "sp_" + idx, "st_" + idx, candidate.seq,
+                             validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Sequence: ", "シーケンス: ")) + validationError); return;
       }
-      if (server.hasArg("ss_" + idx)) candidate.seq.start = server.arg("ss_" + idx).toFloat();
-      if (server.hasArg("se_" + idx)) candidate.seq.end = server.arg("se_" + idx).toFloat();
-      if (server.hasArg("sp_" + idx)) candidate.seq.step = server.arg("sp_" + idx).toFloat();
-      if (server.hasArg("st_" + idx)) candidate.seq.valueType = (ValueType)constrain(server.arg("st_" + idx).toInt(), (int)TYPE_FLOAT, (int)TYPE_STRING);
-      normalizeSequence(candidate.seq);
       if (deviceConfigStorageBytes(candidate) > MAX_DEVICE_CONFIG_BYTES) {
         sendUiResult(413, tr("Save error", "保存エラー"), tr("The device configuration is too large. Delete messages or shorten Address and Value fields.", "デバイス設定の容量が大きすぎます。メッセージを削除するか、AddressとValueを短くしてください。")); return;
       }
@@ -900,16 +925,11 @@ void handleSave() {
       if (!parseMessageList(idx,"e",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
       if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
       if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
-      if (server.hasArg("ek_" + idx)) candidate.clickSeq.address = server.arg("ek_" + idx);
-      candidate.clickSeq.address.trim();
-      if (!validOscAddressText(candidate.clickSeq.address, validationError)) {
-        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Click Sequence Address: ", "エンコーダークリックシーケンスOSCアドレス: ")) + validationError); return;
+      if (!parseSequenceForm("ek_" + idx, "en_" + idx, "e2_" + idx,
+                             "e3_" + idx, "el_" + idx,
+                             candidate.clickSeq, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Click Sequence: ", "エンコーダークリックシーケンス: ")) + validationError); return;
       }
-      if (server.hasArg("en_" + idx)) candidate.clickSeq.start = server.arg("en_" + idx).toFloat();
-      if (server.hasArg("e2_" + idx)) candidate.clickSeq.end = server.arg("e2_" + idx).toFloat();
-      if (server.hasArg("e3_" + idx)) candidate.clickSeq.step = server.arg("e3_" + idx).toFloat();
-      if (server.hasArg("el_" + idx)) candidate.clickSeq.valueType = (ValueType)server.arg("el_" + idx).toInt();
-      normalizeSequence(candidate.clickSeq);
       devices[i].enc = candidate;
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       AngleOscConfig candidate = devices[i].angle;
@@ -947,16 +967,11 @@ void handleSave() {
       if (!parseMessageList(idx,"j",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
       if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
       if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
-      if (server.hasArg("jk_" + idx)) candidate.clickSeq.address = server.arg("jk_" + idx);
-      candidate.clickSeq.address.trim();
-      if (!validOscAddressText(candidate.clickSeq.address, validationError)) {
-        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Joystick Click Sequence Address: ", "JoystickクリックシーケンスOSCアドレス: ")) + validationError); return;
+      if (!parseSequenceForm("jk_" + idx, "jn_" + idx, "j2_" + idx,
+                             "j3_" + idx, "jl_" + idx,
+                             candidate.clickSeq, validationError)) {
+        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Joystick Click Sequence: ", "Joystickクリックシーケンス: ")) + validationError); return;
       }
-      if (server.hasArg("jn_" + idx)) candidate.clickSeq.start = server.arg("jn_" + idx).toFloat();
-      if (server.hasArg("j2_" + idx)) candidate.clickSeq.end = server.arg("j2_" + idx).toFloat();
-      if (server.hasArg("j3_" + idx)) candidate.clickSeq.step = server.arg("j3_" + idx).toFloat();
-      if (server.hasArg("jl_" + idx)) candidate.clickSeq.valueType = (ValueType)server.arg("jl_" + idx).toInt();
-      normalizeSequence(candidate.clickSeq);
       devices[i].joy = candidate;
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
       TofOscConfig candidate = devices[i].tof;

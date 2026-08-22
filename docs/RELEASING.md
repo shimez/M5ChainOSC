@@ -14,7 +14,7 @@ GitHubリポジトリの`Settings` → `Pages` → `Build and deployment`を開�
 
 ## タグを作る前の準備
 
-例えば次の正式版を`1.6.1`とする場合、タグを作る前のコミットで次を更新します。
+例えば次の正式版を`1.7.0`とする場合、タグを作る前のコミットで次を更新します。
 
 - `src/config.h`の`APP_VERSION`
 - `docs/installer/manifest.json`のバージョンとファームウェアパス
@@ -50,8 +50,8 @@ git status
 作業ツリーがクリーンであることを確認してから、バージョンに対応するタグを作成します。
 
 ```powershell
-git tag -a v1.6.1 -m "M5ChainOSC v1.6.1"
-git push origin v1.6.1
+git tag -a v1.7.0 -m "M5ChainOSC v1.7.0"
+git push origin v1.7.0
 ```
 
 `vX.Y.Z`形式のタグがpushされると、手動テストと同じビルドを行った後、次を添付したドラフトReleaseを作成します。
@@ -87,7 +87,7 @@ GitHubのドラフトReleaseで次を確認します。
 manifestのファームウェアパスは、次の形式にします。
 
 ```text
-firmware/M5ChainOSC-1.6.1-AtomS3R-merged.bin
+firmware/M5ChainOSC-1.7.0-AtomS3R-merged.bin
 ```
 
 ローカルに対応するファームウェアを配置した場合は、Installerの完全な整合性を確認できます。
@@ -109,7 +109,7 @@ python scripts/check_release_version.py --check-installer-metadata
 タグをまだGitHubへpushしていない場合は、ローカルタグを削除して修正できます。
 
 ```powershell
-git tag -d v1.6.1
+git tag -d v1.7.0
 ```
 
 すでにタグをpushした場合は、失敗原因を修正した新しいコミットへ同じタグを付け直すより、状況を確認してから対応してください。公開済みReleaseのタグは移動しないでください。

@@ -7,8 +7,13 @@
 static void sendMessagesWithFeedback(const ChainDevice& device,
                                      const OSCMessage* messages,
                                      uint8_t count) {
-  for (uint8_t i = 0; i < count; i++) sendOSC(messages[i]);
-  queueOscFeedback(deviceDisplayName(device), messages, count);
+  OSCMessage sentMessages[MAX_KEY_OSC_MESSAGES];
+  uint8_t sentCount = 0;
+  for (uint8_t i = 0; i < count; i++) {
+    if (sendOSC(messages[i])) sentMessages[sentCount++] = messages[i];
+  }
+  if (sentCount > 0)
+    queueOscFeedback(deviceDisplayName(device), sentMessages, sentCount);
 }
 
 // ---------------------------------------------------------------------------
