@@ -6,6 +6,13 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.8.1]
+
+### Changed
+
+- OSC送信先の表記をChainOSCmini、ChainOSCnanoと共通化
+- 保存済みデバイス設定では、誤操作防止のため接続中デバイスの削除ボタンを表示しないよう変更
+
 ## [1.8.0]
 
 ### Added
@@ -166,7 +173,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.1
 [1.8.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.0
 [1.7.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.7.0
 [1.6.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.6.1
