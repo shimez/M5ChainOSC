@@ -659,8 +659,8 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
   html += "</div></div>";
 
   html += "<form id='settings-form' action='/save' method='POST' onsubmit='saveSettings(event);return false'><div class='card'><h2>" + String(tr("OSC Destination", "OSC送信先")) + "</h2>";
-  html += "<label>Host IP</label><input name='host' value='" + htmlEscape(osc_host) + "'>";
-  html += "<label>Port</label><input type='number' name='port' value='" + String(osc_port) + "'></div>";
+  html += "<label>" + String(tr("Hostname or IPv4 address", "ホスト名またはIPv4アドレス")) + "</label><input name='host' value='" + htmlEscape(osc_host) + "'>";
+  html += "<label>" + String(tr("UDP Port", "UDPポート")) + "</label><input type='number' name='port' value='" + String(osc_port) + "'></div>";
 
   if (deviceCount == 0)
     html += "<div class='card'><p class='note'>" + String(tr("No device connected.", "デバイスが接続されていません。")) + "</p></div>";
@@ -830,9 +830,12 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     html += "</h2>";
     html += "<p class='meta'>Type: <strong>" + String(typeToName(knownDevices[i].type)) + "</strong></p>";
     html += "<div class='uid'>" + htmlEscape(knownDevices[i].uid) + "</div>";
-    html += "<form action='/delete_device' method='POST' onsubmit='deleteSavedDevice(event,this);return false'>";
-    html += "<input type='hidden' name='uid' value='" + htmlEscape(knownDevices[i].uid) + "'>";
-    html += "<button class='btn-warning' type='submit'>" + String(tr("Delete Settings", "設定を削除")) + "</button></form></div>";
+    if (!con) {
+      html += "<form action='/delete_device' method='POST' onsubmit='deleteSavedDevice(event,this);return false'>";
+      html += "<input type='hidden' name='uid' value='" + htmlEscape(knownDevices[i].uid) + "'>";
+      html += "<button class='btn-warning' type='submit'>" + String(tr("Delete Settings", "設定を削除")) + "</button></form>";
+    }
+    html += "</div>";
     if (!flushHtml("SAVED_DEVICE_SENT")) return;
   }
   html += "</main></body></html>";
