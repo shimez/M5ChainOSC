@@ -1,5 +1,9 @@
 # M5ChainOSC
 
+このプロジェクトのソフトウェア、Webサイト、ドキュメントは、OpenAI CodexおよびxAI Grokとの協働により制作されています。
+
+This project's software, website, and documentation are created in collaboration with OpenAI Codex and xAI Grok.
+
 M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操作をOSCメッセージとして送信するファームウェアです。ブラウザーから送信先やデバイスごとの動作を設定でき、設定はChainデバイスのUID単位で本体へ保存されます。
 
 主にVRChatのアバターパラメーター操作を想定していますが、OSCを受信できるアプリケーションで利用できます。
