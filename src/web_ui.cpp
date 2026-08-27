@@ -160,7 +160,11 @@ static bool validOscMessage(const OSCMessage& m, String& error) {
   String address = m.address;
   address.trim();
   if (!validOscAddressText(address, error)) return false;
-  if (m.valueStr.length() > MAX_OSC_VALUE_BYTES) { error = tr("OSC Value is too long.", "OSC Valueが長すぎます。"); return false; }
+  if (m.valueStr.length() > MAX_OSC_VALUE_BYTES) {
+    error = tr("E_OSC_VALUE_TOO_LONG: OSC Value is too long. Keep it within 128 bytes in UTF-8.",
+               "E_OSC_VALUE_TOO_LONG: OSC Valueが長すぎます。UTF-8で128バイト以内にしてください。");
+    return false;
+  }
   if (m.valueType == TYPE_FLOAT) {
     char* end = nullptr; float value = strtof(m.valueStr.c_str(), &end);
     if (!end || end == m.valueStr.c_str() || *end != '\0' || !isfinite(value)) { error = tr("Float value is invalid.", "Float値が正しくありません。"); return false; }
@@ -355,6 +359,17 @@ static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence, Strin
   sequence.step = object["step"].as<float>();
   if (!isfinite(sequence.start) || !isfinite(sequence.end) || !isfinite(sequence.step)) {
     error = tr("Sequence values are invalid.", "シーケンスの値が正しくありません。"); return false;
+  }
+  if (sequence.step == 0.0f) {
+    error = tr("E_SEQUENCE_STEP_ZERO: Sequence Step must not be zero. Specify a non-zero value that moves from Start toward End.",
+               "E_SEQUENCE_STEP_ZERO: SequenceのStepには0を指定できません。StartからEndへ進む0以外の値を指定してください。");
+    return false;
+  }
+  if ((sequence.start < sequence.end && sequence.step < 0.0f) ||
+      (sequence.start > sequence.end && sequence.step > 0.0f)) {
+    error = tr("E_SEQUENCE_DIRECTION_INVALID: Sequence direction is invalid. Use a positive Step when Start is below End and a negative Step when Start is above End.",
+               "E_SEQUENCE_DIRECTION_INVALID: Sequenceの進行方向が正しくありません。StartがEndより小さい場合は正のStep、大きい場合は負のStepを指定してください。");
+    return false;
   }
   normalizeSequence(sequence);
   return true;
