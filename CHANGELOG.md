@@ -203,7 +203,7 @@ M5ChainOSCの主な変更履歴を記録します。
 - AtomS3R用Web Installerを公開
 
 [Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.1...HEAD
-[1.9.0]: https://github.com/shimez/M5ChainOSC/compare/v1.9.0...v1.9.1
+[1.9.1]: https://github.com/shimez/M5ChainOSC/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.9.0
 [1.8.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.1
 [1.8.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.0
