@@ -1034,9 +1034,19 @@ void handleSave() {
       devices[i].lastTofMm = -1;
     }
 
-    if (!isPlaceholderUid(devices[i].uid) && !saveDeviceSettings(devices[i])) {
-      sendUiResult(507, tr("Save error", "保存エラー"), tr("The device configuration could not be written to storage. Delete messages or shorten Address and Value fields, then try again.", "デバイス設定をストレージへ書き込めませんでした。メッセージを削除するか、AddressとValueを短くしてからもう一度お試しください。"));
-      return;
+    if (!isPlaceholderUid(devices[i].uid)) {
+      if (!canRegisterKnownDevice(devices[i].uid, devices[i].type)) {
+        sendUiResult(
+            409, tr("Save error", "保存エラー"),
+            String(tr("The device settings exceed the per-type limit of ",
+                      "デバイスの設定が種別ごとの上限")) +
+                String(MAX_KNOWN_PER_TYPE) + String(tr(".", "件を超えています。")));
+        return;
+      }
+      if (!saveDeviceSettings(devices[i])) {
+        sendUiResult(507, tr("Save error", "保存エラー"), tr("The device configuration could not be written to storage. Delete messages or shorten Address and Value fields, then try again.", "デバイス設定をストレージへ書き込めませんでした。メッセージを削除するか、AddressとValueを短くしてからもう一度お試しください。"));
+        return;
+      }
     }
   }
   sendUiResult(200, tr("Saved!", "保存しました！"), tr("All settings were saved.", "すべての設定を保存しました。"));
@@ -1292,12 +1302,24 @@ void handleImportSettings() {
   if (!candidate) { server.send(503, "text/plain; charset=utf-8", tr("Not enough memory to validate settings.", "設定を検証するためのメモリが不足しています。")); return; }
   String validationError;
   int deviceNumber = 0;
+  int importedTypeCounts[SAVED_DEVICE_TYPE_COUNT] = {};
   for (size_t deviceIndex = 0; deviceIndex < importedDevices.size(); deviceIndex++) {
     JsonObjectConst object = importedDevices[deviceIndex].as<JsonObjectConst>();
     deviceNumber = (int)deviceIndex + 1;
     if (!deviceFromJson(object, *candidate, validationError)) {
       delete candidate;
       server.send(400, "text/plain; charset=utf-8", String(tr("Device ", "デバイス ")) + String(deviceNumber) + ": " + validationError); return;
+    }
+    int typeSlot = (int)candidate->type - 1;
+    if (typeSlot < 0 || typeSlot >= SAVED_DEVICE_TYPE_COUNT) {
+      delete candidate;
+      server.send(400, "text/plain; charset=utf-8", String(tr("Device ", "デバイス ")) + String(deviceNumber) + ": " + tr("Unsupported device type.", "対応していないデバイス種別です。")); return;
+    }
+    importedTypeCounts[typeSlot]++;
+    if (importedTypeCounts[typeSlot] > MAX_KNOWN_PER_TYPE) {
+      String message = String(typeToName(candidate->type)) + String(tr(" settings exceed the per-type limit of ", "の設定が種別ごとの上限")) + String(MAX_KNOWN_PER_TYPE) + String(tr(".", "件を超えています。"));
+      delete candidate;
+      server.send(400, "text/plain; charset=utf-8", message); return;
     }
     for (size_t previousIndex = 0; previousIndex < deviceIndex; previousIndex++) {
       JsonObjectConst previous = importedDevices[previousIndex].as<JsonObjectConst>();
@@ -1320,7 +1342,7 @@ void handleImportSettings() {
       server.send(507, "text/plain; charset=utf-8", String(tr("Storage write failed at device ", "デバイス設定のストレージ書き込みに失敗しました: ")) + String(deviceNumber) + "."); return;
     }
     bool alreadyKnown = findKnownIndex(candidate->uid) >= 0;
-    if (!alreadyKnown && knownCount >= MAX_KNOWN) {
+    if (!alreadyKnown && !canRegisterKnownDevice(candidate->uid, candidate->type)) {
       skippedDeviceCount++;
       continue;
     }

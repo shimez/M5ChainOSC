@@ -1,6 +1,7 @@
 #include "storage.h"
 #include "globals.h"
 #include "display.h"
+#include "device_file_storage.h"
 #include <ctype.h>
 
 #if M5CHAINOSC_STORAGE_DEBUG
@@ -460,6 +461,20 @@ static bool saveTypedDeviceConfig(const ChainDevice& d) {
   return ok;
 }
 
+static void clearLegacyDeviceCopies(const String& uid) {
+  Preferences direct;
+  String ns = deviceStorageNamespace(uid);
+  if (direct.begin(ns.c_str(), false)) { direct.clear(); direct.end(); }
+  String key = deviceCfgKey(uid);
+  if (prefs.begin("devcfg", false)) {
+    prefs.remove(key.c_str()); prefs.remove(deviceCfgKeyLegacy(uid).c_str());
+    prefs.remove(deviceNameKey(uid).c_str());
+    prefs.remove(deviceNameKeyLegacy(uid).c_str());
+    prefs.end();
+  }
+  if (prefs.begin("keymulti", false)) { prefs.remove(key.c_str()); prefs.end(); }
+}
+
 String serializeDeviceConfig(const ChainDevice& d) {
   String o;
   appendField(o, (int)d.type);
@@ -656,9 +671,24 @@ void loadDeviceSettings(ChainDevice& d) {
   d.type = liveType;
   if (!d.uid.length() || isPlaceholderUid(d.uid)) return;
 
-  // New compact format first. The old shared namespaces remain a read-only
-  // fallback and are migrated on the next successful save.
-  if (loadTypedDeviceConfig(d)) return;
+  String fileBlob;
+  DeviceFileLoadResult fileResult = deviceFileStorageLoad(d, fileBlob);
+  if (fileResult == DeviceFileLoadResult::Loaded) {
+    if (applyTypedDeviceConfig(d, fileBlob)) return;
+    STORAGE_LOG("LOAD LittleFS decode failed: uid=%s", d.uid.c_str());
+    setDefaultDeviceMessages(d);
+    d.type = liveType;
+  }
+
+  // Current typed NVS and older shared namespaces are migration-only fallbacks.
+  if (loadTypedDeviceConfig(d)) {
+    String migrated = serializeTypedDeviceConfig(d);
+    if (deviceFileStorageSave(d, migrated)) {
+      clearLegacyDeviceCopies(d.uid);
+      STORAGE_LOG("MIGRATE typed NVS -> LittleFS: uid=%s", d.uid.c_str());
+    }
+    return;
+  }
   setDefaultDeviceMessages(d);
   d.type = liveType;
 
@@ -732,6 +762,14 @@ void loadDeviceSettings(ChainDevice& d) {
   d.tof.maxDistanceMm = constrain(d.tof.maxDistanceMm, 31, 2000);
   d.tof.map.inMax = d.tof.maxDistanceMm;
   d.tof.map.outType = d.tof.map.outType == TYPE_INT ? TYPE_INT : TYPE_FLOAT;
+
+  if (blob.length()) {
+    String migrated = serializeTypedDeviceConfig(d);
+    if (deviceFileStorageSave(d, migrated)) {
+      clearLegacyDeviceCopies(d.uid);
+      STORAGE_LOG("MIGRATE legacy NVS -> LittleFS: uid=%s", d.uid.c_str());
+    }
+  }
 }
 
 bool saveDeviceSettings(const ChainDevice& d) {
@@ -739,28 +777,27 @@ bool saveDeviceSettings(const ChainDevice& d) {
     STORAGE_LOG("SAVE rejected placeholder: uid=%s", d.uid.c_str());
     return false;
   }
-  if (!saveTypedDeviceConfig(d)) {
-    STORAGE_LOG("SAVE typed failed: uid=%s", d.uid.c_str());
+  if (!canRegisterKnownDevice(d.uid, d.type)) {
+    STORAGE_LOG("SAVE rejected type limit: uid=%s type=%d limit=%d",
+                d.uid.c_str(), (int)d.type, MAX_KNOWN_PER_TYPE);
+    return false;
+  }
+  String blob = serializeTypedDeviceConfig(d);
+  if (!blob.length() || blob.length() > MAX_DEVICE_CONFIG_BYTES ||
+      !deviceFileStorageSave(d, blob)) {
+    STORAGE_LOG("SAVE LittleFS failed: uid=%s", d.uid.c_str());
     return false;
   }
 
-  // Release old copies only after the new setting has been read back and
-  // verified. Existing firmware data therefore remains loadable until its
-  // first successful D1 save.
-  String migratedKey = deviceCfgKey(d.uid);
-  if (prefs.begin("devcfg", false)) {
-    prefs.remove(migratedKey.c_str()); prefs.remove(deviceCfgKeyLegacy(d.uid).c_str());
-    prefs.remove(deviceNameKey(d.uid).c_str()); prefs.remove(deviceNameKeyLegacy(d.uid).c_str());
-    prefs.end();
-  }
-  if (prefs.begin("keymulti", false)) { prefs.remove(migratedKey.c_str()); prefs.end(); }
-  registerKnownDevice(d.uid, d.displayName, d.type);
-  STORAGE_LOG("SAVE end: uid=%s ok=1 format=D1", d.uid.c_str());
+  clearLegacyDeviceCopies(d.uid);
+  if (!registerKnownDevice(d.uid, d.displayName, d.type)) return false;
+  STORAGE_LOG("SAVE end: uid=%s ok=1 target=LittleFS", d.uid.c_str());
   return true;
 }
 
 void deleteDeviceSettingsByUid(const String& uid) {
   if (!uid.length()) return;
+  if (!deviceFileStorageRemove(uid)) return;
   if (!isPlaceholderUid(uid)) {
     Preferences direct;
     String directNs = deviceStorageNamespace(uid);
@@ -826,6 +863,9 @@ void saveKnownList() {
   for (int i = 0; i < MAX_KNOWN; i++) {
     if (!knownDevices[i].used || !knownDevices[i].uid.length()) continue;
     if (isPlaceholderUid(knownDevices[i].uid)) continue;
+    // File-backed devices are discovered directly from LittleFS. Keep only
+    // unmigrated entries in NVS so old firmware data remains discoverable.
+    if (deviceFileStorageExists(knownDevices[i].uid)) continue;
     if (blob.length()) blob += ";";
     String n = knownDevices[i].displayName;
     n.replace(";", " ");
@@ -839,6 +879,8 @@ void saveKnownList() {
 
 void loadKnownList() {
   clearKnownInMemory();
+  deviceFileStorageBegin();
+  knownCount = (int)deviceFileStorageList(knownDevices, MAX_KNOWN);
   prefs.begin("known", true);
   String blob = prefs.getString("list", "");
   prefs.end();
@@ -858,11 +900,13 @@ void loadKnownList() {
     uid.trim();
     name.trim();
     typeStr.trim();
-    if (uid.length() && !isPlaceholderUid(uid)) {
+    chain_device_type_t type = (chain_device_type_t)typeStr.toInt();
+    if (uid.length() && !isPlaceholderUid(uid) && findKnownIndex(uid) < 0 &&
+        canRegisterKnownDevice(uid, type)) {
       knownDevices[knownCount].used = true;
       knownDevices[knownCount].uid = uid;
       knownDevices[knownCount].displayName = name;
-      knownDevices[knownCount].type = (chain_device_type_t)typeStr.toInt();
+      knownDevices[knownCount].type = type;
       knownCount++;
     } else if (uid.length()) {
       cleaned = true;
@@ -884,14 +928,32 @@ bool isUidConnected(const String& uid) {
   return false;
 }
 
-void registerKnownDevice(const String& uid, const String& displayName, chain_device_type_t type) {
-  if (!uid.length() || isPlaceholderUid(uid)) return;
+int knownDeviceCountForType(chain_device_type_t type) {
+  int count = 0;
+  for (int i = 0; i < MAX_KNOWN; i++)
+    if (knownDevices[i].used && knownDevices[i].type == type) count++;
+  return count;
+}
+
+bool canRegisterKnownDevice(const String& uid, chain_device_type_t type) {
+  if (!uid.length() || isPlaceholderUid(uid)) return false;
+  if (type != CHAIN_KEY_TYPE_CODE && type != CHAIN_ENCODER_TYPE_CODE &&
+      type != CHAIN_ANGLE_TYPE_CODE && type != CHAIN_JOYSTICK_TYPE_CODE &&
+      type != CHAIN_TOF_TYPE_CODE)
+    return false;
+  int existing = findKnownIndex(uid);
+  if (existing >= 0 && knownDevices[existing].type == type) return true;
+  return knownDeviceCountForType(type) < MAX_KNOWN_PER_TYPE;
+}
+
+bool registerKnownDevice(const String& uid, const String& displayName, chain_device_type_t type) {
+  if (!canRegisterKnownDevice(uid, type)) return false;
   int idx = findKnownIndex(uid);
   if (idx >= 0) {
     knownDevices[idx].displayName = displayName;
     if (type != CHAIN_UNKNOWN_TYPE_CODE) knownDevices[idx].type = type;
     saveKnownList();
-    return;
+    return true;
   }
   for (int i = 0; i < MAX_KNOWN; i++) {
     if (!knownDevices[i].used) {
@@ -901,9 +963,10 @@ void registerKnownDevice(const String& uid, const String& displayName, chain_dev
       knownDevices[i].type = type;
       knownCount++;
       saveKnownList();
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 void unregisterKnownDevice(const String& uid) {
@@ -961,6 +1024,7 @@ void resetAllSettings() {
   showResetProgress(RESET_HOLD_MS);
   delay(300);
   showMessage("RESET", "Clearing...");
+  deviceFileStorageClear();
   for (int i = 0; i < MAX_KNOWN; i++) {
     if (!knownDevices[i].used || !knownDevices[i].uid.length()) continue;
     Preferences direct;

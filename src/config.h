@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "M5Chain.h"
 
-static const char* APP_VERSION = "1.8.1";
+static const char* APP_VERSION = "1.9.0";
 
 // ---------------------------------------------------------------------------
 // Hardware / bus
@@ -15,7 +15,9 @@ static const char* APP_VERSION = "1.8.1";
 // Limits
 // ---------------------------------------------------------------------------
 static const int MAX_DEVICES = 8;
-static const int MAX_KNOWN   = 40;
+static const int MAX_KNOWN_PER_TYPE = 40;
+static const int SAVED_DEVICE_TYPE_COUNT = 5;
+static const int MAX_KNOWN = MAX_KNOWN_PER_TYPE * SAVED_DEVICE_TYPE_COUNT;
 static const int MAX_KEY_OSC_MESSAGES = 8;
 static const size_t MAX_OSC_ADDRESS_BYTES = 192;
 static const size_t MAX_OSC_VALUE_BYTES = 128;

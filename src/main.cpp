@@ -16,7 +16,7 @@
  * 主な機能
  *   - 初回は AP モード（SSID: AtomS3R-OSC / Pass: 12345678）で WiFi 設定
  *   - ブラウザから OSC 送信先・デバイスごとのパラメータを設定
- *   - 設定はデバイス UID 単位で NVS に保存（ホットスワップ対応）
+ *   - 設定はデバイス UID 単位で LittleFS に保存（ホットスワップ対応）
  *   - 画面 10 秒長押しで全設定リセット
  *
  * ----------------------------------------------------------------------------
@@ -40,7 +40,7 @@
  *     types.h               … 構造体定義
  *     globals.h / .cpp      … 共有状態・小さなヘルパ
  *     display.h / .cpp      … 画面描画・回転・リセット演出
- *     storage.h / .cpp      … NVS 永続化・Known リスト
+ *     storage.h / .cpp      … LittleFS永続化・NVS移行・Knownリスト
  *     osc_send.h / .cpp     … OSC 送信
  *     chain_devices.h / .cpp… 列挙・ホットスワップ・ポーリング
  *     wifi_manager.h / .cpp … STA / AP 接続

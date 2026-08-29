@@ -6,6 +6,29 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.9.0]
+
+### Added
+
+- デバイス設定ファイルのサイズとLittleFSの総容量・使用量・空き容量をシリアルログへ出力
+- 一時ファイルを再読込・検証してから既存設定を置換する安全な保存処理
+
+### Changed
+
+- 保存済みデバイスの上限を全種類合計40件から、Key、Encoder、Angle、Joystick、ToFそれぞれ40件へ変更
+- Key、Encoder、Angle、Joystick、ToFのデバイス設定保存先をNVSからLittleFSへ移行
+- ChainデバイスのUID全体を設定ファイル名として使用
+- 保存済みデバイス一覧はLittleFS上の設定ファイルを正本として復元
+- 現行typed NVSおよび従来NVS設定を、LittleFSファイルがない場合に自動移行
+- PlatformIOのパーティションを`default_8MB.csv`へ明示的に固定
+- Arduino IDEでは`8M with spiffs (3MB APP/1.5MB SPIFFS)`を必須とする手順をREADMEへ追記
+
+### Fixed
+
+- 「すべての設定を保存」で種別ごとの40件上限を超えた場合に、ストレージ書込エラーではなく上限超過を明示
+- NVSの容量・断片化・単一blob制約により、大きなデバイス設定や多数の設定を保存できなくなる問題を解消
+- Chain構成が変化していない場合でも、ホットスワップ検出のたびに全デバイス設定をLittleFSから再読込していた問題を解消
+
 ## [1.8.1]
 
 ### Changed
@@ -173,7 +196,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/shimez/M5ChainOSC/compare/v1.8.1...v1.9.0
 [1.8.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.1
 [1.8.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.0
 [1.7.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.7.0

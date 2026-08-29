@@ -341,12 +341,6 @@ bool refreshChainDevices(bool force) {
 #endif
       }
 
-      if (!isPlaceholderUid(d.uid)) {
-        loadDeviceSettings(d);
-      } else {
-        setDefaultDeviceMessages(d);
-        d.type = infoList[i].device_type;
-      }
       tmpCount++;
     }
   }
@@ -355,6 +349,19 @@ bool refreshChainDevices(bool force) {
   bool changed = (fp != lastDeviceFingerprint) || force;
 
   if (changed) {
+    // Enumeration runs periodically for hot-swap detection. Read persistent
+    // settings only after the topology fingerprint changes; otherwise every
+    // scan would reopen every LittleFS device file.
+    for (int i = 0; i < tmpCount; i++) {
+      if (!isPlaceholderUid(tmp[i].uid)) {
+        loadDeviceSettings(tmp[i]);
+      } else {
+        chain_device_type_t liveType = tmp[i].type;
+        setDefaultDeviceMessages(tmp[i]);
+        tmp[i].type = liveType;
+      }
+    }
+
     deviceCount = tmpCount;
     lastKnownDeviceCount = tmpCount;
     lastDeviceFingerprint = fp;

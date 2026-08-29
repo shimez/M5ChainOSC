@@ -34,6 +34,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 - Chainデバイスの接続・取り外し・再接続の検出
 - 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示
 - UID単位の設定保存と再接続時の復元
+- Key、Encoder、Angle、Joystick、ToFの各種別ごと40件まで設定を保存
 - OSC値の`Float`、`Int`、`String`送信
 - Key、Encoderクリック、Joystickクリックから複数OSCメッセージを送信
 - Press／Release合計8件まで追加・削除・並べ替え
@@ -101,7 +102,10 @@ pio device monitor -b 115200
 2. `M5ChainOSC.ino`をArduino IDEで開きます。
 3. 必要なライブラリをインストールします。
 4. AtomS3Rに適したESP32ボード設定とシリアルポートを選択します。
-5. 検証後、書き込みを実行します。
+5. `Tools`→`Partition Scheme`で`8M with spiffs (3MB APP/1.5MB SPIFFS)`を選択します。
+6. 検証後、書き込みを実行します。
+
+このPartition Schemeは必須です。デバイス設定の保存にLittleFSを使用するため、ファイルシステム領域のない構成では設定を保存・復元できません。Arduino IDE上では`SPIFFS`と表示される領域を、ファームウェアからLittleFSとして使用します。
 
 `M5ChainOSC.ino`はArduino IDE用のエントリーポイントです。共通実装は`src/`以下にあります。
 
@@ -161,7 +165,8 @@ THIRD_PARTY_NOTICES.md  第三者コンポーネントとライセンス情報
 src/
   main.cpp              共通実装とPlatformIO用エントリーポイント
   chain_devices.*       Chainデバイスの列挙・入力・OSC送信
-  storage.*             NVSへの設定保存・読込
+  storage.*             LittleFSへの設定保存・NVS設定の移行
+  device_file_storage.* LittleFSファイルの安全な保存・読込・置換
   web_ui.*              Web UIとJSON入出力
   display.*             AtomS3Rの画面表示
   wifi_manager.*        Wi-Fi STA／AP処理
