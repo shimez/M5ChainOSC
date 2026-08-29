@@ -6,6 +6,12 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.9.1]
+
+### Added
+
+- JSONインポート時のメッセージをChainOSC Device Preset Import Error Registry v1に沿った内容に修正（14種類）
+
 ## [1.9.0]
 
 ### Added
@@ -196,8 +202,9 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.0...HEAD
-[1.9.0]: https://github.com/shimez/M5ChainOSC/compare/v1.8.1...v1.9.0
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.1...HEAD
+[1.9.0]: https://github.com/shimez/M5ChainOSC/compare/v1.9.0...v1.9.1
+[1.9.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.9.0
 [1.8.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.1
 [1.8.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.8.0
 [1.7.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.7.0

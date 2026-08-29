@@ -145,12 +145,22 @@ static String clickMessagesHtml(const String& idx, const String& prefix, bool se
 }
 
 static bool validOscAddressText(const String& address, String& error) {
-  if (!address.length() || !address.startsWith("/")) { error = tr("OSC Address must start with /.", "OSC Addressは / から始めてください。"); return false; }
-  if (address.length() > MAX_OSC_ADDRESS_BYTES) { error = tr("OSC Address is too long.", "OSC Addressが長すぎます。"); return false; }
+  if (!address.length() || !address.startsWith("/")) {
+    error = tr("E_OSC_ADDRESS_INVALID: OSC Address must start with `/` and must not contain whitespace or `# * , ? [ ] { }`.",
+               "E_OSC_ADDRESS_INVALID: OSC Addressは「/」から始め、空白および`# * , ? [ ] { }`を含めないでください。");
+    return false;
+  }
+  if (address.length() > MAX_OSC_ADDRESS_BYTES) {
+    error = tr("E_OSC_ADDRESS_TOO_LONG: OSC Address is too long. Keep it within 192 bytes in UTF-8.",
+               "E_OSC_ADDRESS_TOO_LONG: OSC Addressが長すぎます。UTF-8で192バイト以内にしてください。");
+    return false;
+  }
   for (size_t i = 0; i < address.length(); i++) {
     char c = address[i];
     if (isspace((unsigned char)c) || c == '#' || c == '*' || c == ',' || c == '?' || c == '[' || c == ']' || c == '{' || c == '}') {
-      error = tr("OSC Address contains an invalid character.", "OSC Addressに使用できない文字が含まれています。"); return false;
+      error = tr("E_OSC_ADDRESS_INVALID: OSC Address must start with `/` and must not contain whitespace or `# * , ? [ ] { }`.",
+                 "E_OSC_ADDRESS_INVALID: OSC Addressは「/」から始め、空白および`# * , ? [ ] { }`を含めないでください。");
+      return false;
     }
   }
   return true;
@@ -167,10 +177,18 @@ static bool validOscMessage(const OSCMessage& m, String& error) {
   }
   if (m.valueType == TYPE_FLOAT) {
     char* end = nullptr; float value = strtof(m.valueStr.c_str(), &end);
-    if (!end || end == m.valueStr.c_str() || *end != '\0' || !isfinite(value)) { error = tr("Float value is invalid.", "Float値が正しくありません。"); return false; }
+    if (!end || end == m.valueStr.c_str() || *end != '\0' || !isfinite(value)) {
+      error = tr("E_OSC_FLOAT32_INVALID: The Float value is invalid. Specify a decimal number representable as a finite OSC float32.",
+                 "E_OSC_FLOAT32_INVALID: Float値が正しくありません。有限のOSC float32として表現できる10進数を指定してください。");
+      return false;
+    }
   } else if (m.valueType == TYPE_INT) {
     errno = 0; char* end = nullptr; long value = strtol(m.valueStr.c_str(), &end, 10);
-    if (!end || end == m.valueStr.c_str() || *end != '\0' || errno == ERANGE || value < INT32_MIN || value > INT32_MAX) { error = tr("Integer value is invalid.", "Int値が正しくありません。"); return false; }
+    if (!end || end == m.valueStr.c_str() || *end != '\0' || errno == ERANGE || value < INT32_MIN || value > INT32_MAX) {
+      error = tr("E_OSC_INT32_INVALID: The Int value is invalid. Specify a decimal integer from `-2147483648` to `2147483647`.",
+                 "E_OSC_INT32_INVALID: Int値が正しくありません。`-2147483648`～`2147483647`の範囲の10進整数を指定してください。");
+      return false;
+    }
   }
   return true;
 }
@@ -207,7 +225,7 @@ static bool parseSequenceForm(const String& addressName,
 
 static bool parseMessageList(const String& idx,const String& prefix,OSCMessage* press,uint8_t& pc,OSCMessage* release,uint8_t& rc,String& error){
   int p=constrain(server.arg(prefix+"pc_"+idx).toInt(),0,MAX_KEY_OSC_MESSAGES),r=constrain(server.arg(prefix+"rc_"+idx).toInt(),0,MAX_KEY_OSC_MESSAGES);
-  if(p+r>MAX_KEY_OSC_MESSAGES){error=tr("Press and Release messages must total 8 or fewer.","PressとReleaseのメッセージは合計8件以内にしてください。");return false;}
+  if(p+r>MAX_KEY_OSC_MESSAGES){error=tr("E_OSC_MESSAGE_COUNT_EXCEEDED: Press and Release OSC messages must total 8 or fewer.","E_OSC_MESSAGE_COUNT_EXCEEDED: PressとReleaseのOSCメッセージは、合計8件以内にしてください。");return false;}
   pc=p;rc=r;
   for(int i=0;i<p;i++){press[i].address=server.arg(prefix+"pa_"+idx+"_"+String(i));press[i].valueStr=server.arg(prefix+"pv_"+idx+"_"+String(i));int t=server.arg(prefix+"pt_"+idx+"_"+String(i)).toInt();press[i].valueType=(ValueType)constrain(t,(int)TYPE_FLOAT,(int)TYPE_STRING);if(!validOscMessage(press[i],error))return false;}
   for(int i=0;i<r;i++){release[i].address=server.arg(prefix+"ra_"+idx+"_"+String(i));release[i].valueStr=server.arg(prefix+"rv_"+idx+"_"+String(i));int t=server.arg(prefix+"rt_"+idx+"_"+String(i)).toInt();release[i].valueType=(ValueType)constrain(t,(int)TYPE_FLOAT,(int)TYPE_STRING);if(!validOscMessage(release[i],error))return false;}
@@ -338,12 +356,14 @@ static bool jsonMessage(JsonObjectConst object, OSCMessage& message, String& err
   message.valueType = (ValueType)type;
   return validOscMessage(message, error);
 }
-static bool jsonMessageArrays(JsonVariantConst pv,JsonVariantConst rv,OSCMessage* press,uint8_t& pc,OSCMessage* release,uint8_t& rc,String& error){if(!pv.is<JsonArrayConst>()||!rv.is<JsonArrayConst>()){error="Click message arrays are missing.";return false;}JsonArrayConst p=pv.as<JsonArrayConst>(),r=rv.as<JsonArrayConst>();if(p.size()+r.size()>MAX_KEY_OSC_MESSAGES){error="Click messages exceed the limit of 8.";return false;}pc=p.size();rc=r.size();uint8_t i=0;for(JsonObjectConst m:p)if(!jsonMessage(m,press[i++],error))return false;i=0;for(JsonObjectConst m:r)if(!jsonMessage(m,release[i++],error))return false;return true;}
+static bool jsonMessageArrays(JsonVariantConst pv,JsonVariantConst rv,OSCMessage* press,uint8_t& pc,OSCMessage* release,uint8_t& rc,String& error){if(!pv.is<JsonArrayConst>()||!rv.is<JsonArrayConst>()){error="Click message arrays are missing.";return false;}JsonArrayConst p=pv.as<JsonArrayConst>(),r=rv.as<JsonArrayConst>();if(p.size()+r.size()>MAX_KEY_OSC_MESSAGES){error=tr("E_OSC_MESSAGE_COUNT_EXCEEDED: Press and Release OSC messages must total 8 or fewer.","E_OSC_MESSAGE_COUNT_EXCEEDED: PressとReleaseのOSCメッセージは、合計8件以内にしてください。");return false;}pc=p.size();rc=r.size();uint8_t i=0;for(JsonObjectConst m:p)if(!jsonMessage(m,press[i++],error))return false;i=0;for(JsonObjectConst m:r)if(!jsonMessage(m,release[i++],error))return false;return true;}
 
 static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence, String& error) {
   if (object.isNull() || !object["address"].is<const char*>() || !object["type"].is<int>() ||
       !object.containsKey("start") || !object.containsKey("end") || !object.containsKey("step")) {
-    error = tr("Sequence fields are missing.", "シーケンスの必須項目がありません。"); return false;
+    error = tr("E_SEQUENCE_REQUIRED_FIELD_MISSING: A required Sequence field is missing. Specify `address`, `type`, `start`, `end`, and `step`.",
+               "E_SEQUENCE_REQUIRED_FIELD_MISSING: Sequenceの必須項目がありません。`address`、`type`、`start`、`end`、`step`を指定してください。");
+    return false;
   }
   sequence.address = object["address"].as<const char*>();
   sequence.address.trim();
@@ -358,7 +378,9 @@ static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence, Strin
   sequence.end = object["end"].as<float>();
   sequence.step = object["step"].as<float>();
   if (!isfinite(sequence.start) || !isfinite(sequence.end) || !isfinite(sequence.step)) {
-    error = tr("Sequence values are invalid.", "シーケンスの値が正しくありません。"); return false;
+    error = tr("E_SEQUENCE_VALUE_INVALID: A Sequence number is invalid. Specify finite numbers for Start, End, and Step.",
+               "E_SEQUENCE_VALUE_INVALID: Sequenceの数値が正しくありません。Start、End、Stepには有限の数値を指定してください。");
+    return false;
   }
   if (sequence.step == 0.0f) {
     error = tr("E_SEQUENCE_STEP_ZERO: Sequence Step must not be zero. Specify a non-zero value that moves from Start toward End.",
@@ -420,7 +442,11 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device, String& 
     device.mode = (KeyMode)mode;
     JsonArrayConst press = key["press"].as<JsonArrayConst>();
     JsonArrayConst release = key["release"].as<JsonArrayConst>();
-    if (press.size() + release.size() > MAX_KEY_OSC_MESSAGES) { error = "Key messages exceed the limit of 8."; return false; }
+    if (press.size() + release.size() > MAX_KEY_OSC_MESSAGES) {
+      error = tr("E_OSC_MESSAGE_COUNT_EXCEEDED: Press and Release OSC messages must total 8 or fewer.",
+                 "E_OSC_MESSAGE_COUNT_EXCEEDED: PressとReleaseのOSCメッセージは、合計8件以内にしてください。");
+      return false;
+    }
     device.pressMessageCount = (uint8_t)press.size();
     device.releaseMessageCount = (uint8_t)release.size();
     uint8_t i = 0;
@@ -629,7 +655,7 @@ function toggleDeviceMenu(event,index){event.stopPropagation();let menu=document
 function toggleDeviceCollapse(index,key){let body=document.getElementById('device-body-'+index),button=document.getElementById('collapse-'+index),collapsed=!body.hidden;body.hidden=collapsed;button.classList.toggle('collapsed',collapsed);button.setAttribute('aria-expanded',collapsed?'false':'true');sessionStorage.setItem('m5osc-collapse-'+key,collapsed?'1':'0')}
 function chooseDevicePreset(index){document.getElementById('preset-file-'+index).click()}
 async function identifyDevice(index,uid){closeDeviceMenus();let status=document.getElementById('preset-status-'+index);status.textContent='';try{let body='index='+encodeURIComponent(index)+'&uid='+encodeURIComponent(uid),response=await fetch('/identify_device',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body}),message=await response.text();if(!response.ok)throw new Error(message);status.textContent=''}catch(e){status.textContent=e.message;alert(e.message)}}
-async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,tx('The preset file is too large.','プリセットファイルが大きすぎます。'));input.value='';return}if(!confirm(tx('Apply this preset to the selected device? Its device settings will be overwritten.','選択したデバイスへこのプリセットを適用しますか？デバイス設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing preset...','プリセットをインポート中...');try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;window.settingsDirty=false;window.settingsSubmitting=true;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
+async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,tx('E_PRESET_FILE_TOO_LARGE: The preset file exceeds 16 KiB. Select a Device Preset JSON file no larger than 16 KiB.','E_PRESET_FILE_TOO_LARGE: プリセットファイルが16 KiBを超えています。16 KiB以内のDevice Preset JSONファイルを選択してください。'));input.value='';return}if(!confirm(tx('Apply this preset to the selected device? Its device settings will be overwritten.','選択したデバイスへこのプリセットを適用しますか？デバイス設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing preset...','プリセットをインポート中...');try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;window.settingsDirty=false;window.settingsSubmitting=true;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 document.addEventListener('click',()=>closeDeviceMenus());
 function initializePage(){let form=document.getElementById('settings-form');if(form){form.addEventListener('input',markDirty);form.addEventListener('change',markDirty)}initializeMessageRows();document.querySelectorAll('.device[data-collapse-key]').forEach(card=>{let key=card.dataset.collapseKey,index=card.dataset.deviceIndex;if(sessionStorage.getItem('m5osc-collapse-'+key)==='1'){let body=document.getElementById('device-body-'+index),button=document.getElementById('collapse-'+index);body.hidden=true;button.classList.add('collapsed');button.setAttribute('aria-expanded','false')}});let saved=sessionStorage.getItem('m5osc-scroll');if(saved!==null){sessionStorage.removeItem('m5osc-scroll');requestAnimationFrame(()=>window.scrollTo(0,Number(saved)||0))}document.querySelectorAll('form:not(#settings-form)').forEach(f=>f.addEventListener('submit',rememberScroll))}
 window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListener('pageshow',()=>window.settingsSubmitting=false);window.addEventListener('beforeunload',e=>{if(window.settingsDirty&&!window.settingsSubmitting){e.preventDefault();e.returnValue=''}});window.addEventListener('DOMContentLoaded',initializePage)
@@ -1134,11 +1160,15 @@ void handleImportDevicePreset() {
   String body = server.arg("plain");
   MEMORY_DEBUG_LOG("PRESET_BODY_RECEIVED", body.length());
   if (!body.length()) {
-    server.send(400, "text/plain; charset=utf-8", tr("Preset file is empty.", "プリセットファイルが空です。"));
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_FILE_EMPTY: The preset file is empty. Select a Device Preset JSON file that contains data.",
+                   "E_PRESET_FILE_EMPTY: プリセットファイルが空です。内容を含むDevice Preset JSONファイルを選択してください。"));
     return;
   }
   if (body.length() > 16384) {
-    server.send(413, "text/plain; charset=utf-8", tr("Preset file exceeds 16 KiB.", "プリセットファイルが16 KiBを超えています。"));
+    server.send(413, "text/plain; charset=utf-8",
+                tr("E_PRESET_FILE_TOO_LARGE: The preset file exceeds 16 KiB. Select a Device Preset JSON file no larger than 16 KiB.",
+                   "E_PRESET_FILE_TOO_LARGE: プリセットファイルが16 KiBを超えています。16 KiB以内のDevice Preset JSONファイルを選択してください。"));
     return;
   }
 
@@ -1149,7 +1179,10 @@ void handleImportDevicePreset() {
   body = "";
   MEMORY_DEBUG_JSON("PRESET_BODY_RELEASED", 0, document);
   if (parseError) {
-    server.send(400, "text/plain; charset=utf-8", String(tr("Invalid JSON: ", "JSONが正しくありません: ")) + parseError.c_str());
+    server.send(400, "text/plain; charset=utf-8",
+                String(tr("E_PRESET_JSON_MALFORMED: The JSON syntax is invalid. Check brackets, quotation marks, commas, and other JSON syntax.",
+                          "E_PRESET_JSON_MALFORMED: JSONの構文が正しくありません。括弧、引用符、カンマなどを確認してください。")) +
+                    " (" + parseError.c_str() + ")");
     return;
   }
 
@@ -1160,18 +1193,23 @@ void handleImportDevicePreset() {
   if (root.isNull() ||
       (presetFormat != DEVICE_PRESET_FORMAT_NAME &&
        presetFormat != LEGACY_DEVICE_PRESET_FORMAT_NAME)) {
-    server.send(400, "text/plain; charset=utf-8", tr("This is not a supported ChainOSC device preset.", "対応するChainOSCデバイスプリセットではありません。"));
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_FORMAT_INVALID: This is not a supported ChainOSC Device Preset. Confirm that `format` is `ChainOSC-device-preset`.",
+                   "E_PRESET_FORMAT_INVALID: 対応するChainOSC Device Presetではありません。`format`が`ChainOSC-device-preset`であることを確認してください。"));
     return;
   }
   if (!root["schemaVersion"].is<int>() ||
       root["schemaVersion"].as<int>() != DEVICE_PRESET_SCHEMA_VERSION) {
-    server.send(400, "text/plain; charset=utf-8", tr("Unsupported or missing preset schemaVersion.", "プリセットのschemaVersionがないか、対応していません。"));
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_SCHEMA_UNSUPPORTED: The preset `schemaVersion` is missing or unsupported. Use a preset exported by a compatible product version.",
+                   "E_PRESET_SCHEMA_UNSUPPORTED: プリセットの`schemaVersion`がないか、対応していません。対応するバージョンの製品からエクスポートしたプリセットを使用してください。"));
     return;
   }
   if (!root["deviceType"].is<int>() ||
       root["deviceType"].as<int>() != (int)devices[index].type) {
     server.send(400, "text/plain; charset=utf-8",
-                "Device type mismatch. Select a preset for " + String(typeToName(devices[index].type)) + ".");
+                tr("E_PRESET_DEVICE_TYPE_MISMATCH: The preset device type does not match the import target. Select a preset for the same device type.",
+                   "E_PRESET_DEVICE_TYPE_MISMATCH: プリセットのデバイス種類がインポート先と一致しません。選択したデバイスと同じ種類のプリセットを使用してください。"));
     return;
   }
 
@@ -1195,7 +1233,9 @@ void handleImportDevicePreset() {
   }
   if (!saveDeviceSettings(*candidate)) {
     delete candidate;
-    server.send(507, "text/plain; charset=utf-8", tr("The preset could not be written to storage.", "プリセットをストレージへ書き込めませんでした。"));
+    server.send(507, "text/plain; charset=utf-8",
+                tr("E_PRESET_STORAGE_WRITE_FAILED: The preset could not be written to storage. Existing settings were not changed. Check available storage and try again.",
+                   "E_PRESET_STORAGE_WRITE_FAILED: プリセットをストレージへ書き込めませんでした。既存の設定は変更されていません。空き容量を確認してから再試行してください。"));
     return;
   }
   delete candidate;
