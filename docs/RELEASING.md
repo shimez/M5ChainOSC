@@ -87,7 +87,7 @@ GitHubのドラフトReleaseで次を確認します。
 manifestのファームウェアパスは、次の形式にします。
 
 ```text
-firmware/M5ChainOSC-1.9.2-AtomS3R-merged.bin
+firmware/M5ChainOSC-1.10.0-AtomS3R-merged.bin
 ```
 
 ローカルに対応するファームウェアを配置した場合は、Installerの完全な整合性を確認できます。

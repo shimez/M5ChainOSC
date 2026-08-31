@@ -4,6 +4,7 @@
 #include "display.h"
 #include "chain_devices.h"
 #include "memory_debug.h"
+#include "system_settings.h"
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -684,10 +685,14 @@ void handleAPRoot() {
 
 void handleSaveWiFi() {
   if (server.hasArg("ssid") && server.hasArg("password") && server.arg("ssid").length()) {
-    prefs.begin("wifi", false);
-    prefs.putString("ssid", server.arg("ssid"));
-    prefs.putString("password", server.arg("password"));
-    prefs.end();
+    if (!systemSettingsSaveWifi(server.arg("ssid"), server.arg("password"))) {
+      server.send(507, "text/plain; charset=utf-8",
+                  tr("Could not save Wi-Fi settings.",
+                     "Wi-Fi設定を保存できませんでした。"));
+      return;
+    }
+    wifi_ssid = server.arg("ssid");
+    wifi_password = server.arg("password");
     server.send(200, "text/html; charset=utf-8", String("<meta charset='utf-8'><h2>") + tr("Saved", "保存しました") + "</h2>");
     delay(1500);
     ESP.restart();
@@ -697,8 +702,15 @@ void handleSaveWiFi() {
 
 void handleSetLanguage() {
   if (server.hasArg("language")) {
+    UiLanguage previous = uiLanguage;
     uiLanguage = server.arg("language") == "ja" ? UI_LANG_JAPANESE : UI_LANG_ENGLISH;
-    saveUiLanguage();
+    if (!saveUiLanguage()) {
+      uiLanguage = previous;
+      sendUiResult(507, tr("Save error", "保存エラー"),
+                   tr("The language setting could not be written to storage.",
+                      "言語設定をストレージへ書き込めませんでした。"));
+      return;
+    }
   }
   server.sendHeader("Location", "/", true);
   server.send(303, "text/plain", "");
@@ -1046,12 +1058,17 @@ void handleSave() {
 #if M5CHAINOSC_STORAGE_DEBUG
   Serial.printf("[M5OSC][WEB] SAVE request args=%d devices=%d\n", server.args(), deviceCount);
 #endif
-  if (server.hasArg("host")) osc_host = server.arg("host");
-  if (server.hasArg("port")) osc_port = server.arg("port").toInt();
-  prefs.begin("osc", false);
-  prefs.putString("host", osc_host);
-  prefs.putInt("port", osc_port);
-  prefs.end();
+  String candidateHost = server.hasArg("host") ? server.arg("host") : osc_host;
+  int candidatePort = server.hasArg("port") ? server.arg("port").toInt() : osc_port;
+  candidateHost.trim();
+  if (!systemSettingsSaveOsc(candidateHost, candidatePort)) {
+    sendUiResult(507, tr("Save error", "保存エラー"),
+                 tr("The OSC destination could not be written to storage. Check Host and Port.",
+                    "OSC送信先をストレージへ書き込めませんでした。ホストとポートを確認してください。"));
+    return;
+  }
+  osc_host = candidateHost;
+  osc_port = candidatePort;
 
   for (int i = 0; i < deviceCount; i++) {
     if (!devices[i].active) continue;
@@ -1229,8 +1246,13 @@ void handleSetRotation() {
   if (server.hasArg("rotation")) {
     int r = server.arg("rotation").toInt();
     if (r >= 0 && r <= 3) {
-      displayRotation = r;
-      saveDisplayRotation();
+      if (!systemSettingsSaveDisplayRotation((uint8_t)r)) {
+        sendUiResult(507, tr("Save error", "保存エラー"),
+                     tr("The display rotation could not be written to storage.",
+                        "画面の向きをストレージへ書き込めませんでした。"));
+        return;
+      }
+      displayRotation = (uint8_t)r;
       applyDisplayRotation();
       if (!isAPMode && !resetInProgress) drawMainScreen();
     }
@@ -1240,9 +1262,14 @@ void handleSetRotation() {
 }
 
 void handleDeleteWifi() {
-  prefs.begin("wifi", false);
-  prefs.clear();
-  prefs.end();
+  if (!systemSettingsClearWifi()) {
+    sendUiResult(507, tr("Delete error", "削除エラー"),
+                 tr("The Wi-Fi settings could not be deleted from storage.",
+                    "Wi-Fi設定をストレージから削除できませんでした。"));
+    return;
+  }
+  wifi_ssid = "";
+  wifi_password = "";
   sendUiResult(200, tr("WiFi deleted", "Wi-Fi設定を削除しました"), tr("The device will restart.", "デバイスを再起動します。"), false);
   delay(1200);
   ESP.restart();
@@ -1551,13 +1578,19 @@ void handleImportSettings() {
   delete candidate;
   MEMORY_DEBUG_JSON("IMPORT_CANDIDATE_RELEASED", 0, document);
 
+  if (!systemSettingsSaveCommon(importedHost, importedPort,
+                                (uint8_t)importedRotation, true,
+                                (uint8_t)importedLanguage)) {
+    server.send(507, "text/plain; charset=utf-8",
+                tr("Global settings could not be written to storage.",
+                   "共通設定をストレージへ書き込めませんでした。"));
+    return;
+  }
   osc_host = importedHost;
   osc_port = importedPort;
   displayRotation = (uint8_t)importedRotation;
   uiLanguage = importedLanguage;
-  prefs.begin("osc", false); prefs.putString("host", osc_host); prefs.putInt("port", osc_port); prefs.end();
-  saveDisplayRotation();
-  saveUiLanguage();
+  uiLanguageConfigured = true;
   applyDisplayRotation();
   refreshChainDevices(true);
   if (!isAPMode && !resetInProgress) drawMainScreen();

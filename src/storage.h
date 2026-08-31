@@ -36,6 +36,6 @@ void unregisterKnownDevice(const String& uid);
 
 // Global settings
 void loadWifiAndOscCommon();
-void saveDisplayRotation();
-void saveUiLanguage();
+bool saveDisplayRotation();
+bool saveUiLanguage();
 void resetAllSettings();

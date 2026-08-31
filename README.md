@@ -34,6 +34,7 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 - Chainデバイスの接続・取り外し・再接続の検出
 - 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示
 - UID単位の設定保存と再接続時の復元
+- デバイス設定に加え、Wi-Fi、OSC送信先、画面回転、Web UI言語をLittleFSへ安全に保存
 - Key、Encoder、Angle、Joystick、ToFの各種別ごと40件まで設定を保存
 - OSC値の`Float`、`Int`、`String`送信
 - Key、Encoderクリック、Joystickクリックから複数OSCメッセージを送信
@@ -167,6 +168,7 @@ src/
   chain_devices.*       Chainデバイスの列挙・入力・OSC送信
   storage.*             LittleFSへの設定保存・NVS設定の移行
   device_file_storage.* LittleFSファイルの安全な保存・読込・置換
+  system_settings.*     共通設定のLittleFS保存・NVSからの初回移行
   web_ui.*              Web UIとJSON入出力
   display.*             AtomS3Rの画面表示
   wifi_manager.*        Wi-Fi STA／AP処理

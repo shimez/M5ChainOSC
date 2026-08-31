@@ -2,6 +2,7 @@
 #include "globals.h"
 #include "display.h"
 #include "device_file_storage.h"
+#include "system_settings.h"
 #include <ctype.h>
 
 #if M5CHAINOSC_STORAGE_DEBUG
@@ -986,44 +987,35 @@ void unregisterKnownDevice(const String& uid) {
 // Global prefs
 // ---------------------------------------------------------------------------
 void loadWifiAndOscCommon() {
-  prefs.begin("wifi", true);
-  wifi_ssid = prefs.getString("ssid", "");
-  wifi_password = prefs.getString("password", "");
-  prefs.end();
-
-  prefs.begin("osc", true);
-  osc_host = prefs.getString("host", "192.168.1.100");
-  osc_port = prefs.getInt("port", 9000);
-  prefs.end();
-
-  prefs.begin("ui", true);
-  displayRotation = prefs.getUChar("rotation", 0);
-  if (displayRotation > 3) displayRotation = 0;
-  uint8_t storedLanguage = prefs.getUChar("language", 0xff);
-  uiLanguageConfigured = storedLanguage <= UI_LANG_JAPANESE;
-  uiLanguage = uiLanguageConfigured ? (UiLanguage)storedLanguage : UI_LANG_ENGLISH;
-  prefs.end();
+  systemSettingsSetup();
+  wifi_ssid = systemSettingsWifiSsid();
+  wifi_password = systemSettingsWifiPassword();
+  osc_host = systemSettingsOscHost();
+  osc_port = systemSettingsOscPort();
+  displayRotation = systemSettingsDisplayRotation();
+  uiLanguageConfigured = systemSettingsHasUiLanguage();
+  uiLanguage = uiLanguageConfigured
+      ? (UiLanguage)systemSettingsUiLanguage()
+      : UI_LANG_ENGLISH;
 
   loadKnownList();
 }
 
-void saveDisplayRotation() {
-  prefs.begin("ui", false);
-  prefs.putUChar("rotation", displayRotation);
-  prefs.end();
+bool saveDisplayRotation() {
+  return systemSettingsSaveDisplayRotation(displayRotation);
 }
 
-void saveUiLanguage() {
-  prefs.begin("ui", false);
-  prefs.putUChar("language", (uint8_t)uiLanguage);
-  prefs.end();
+bool saveUiLanguage() {
+  if (!systemSettingsSaveUiLanguage((uint8_t)uiLanguage)) return false;
   uiLanguageConfigured = true;
+  return true;
 }
 
 void resetAllSettings() {
   showResetProgress(RESET_HOLD_MS);
   delay(300);
   showMessage("RESET", "Clearing...");
+  systemSettingsClearAll();
   deviceFileStorageClear();
   for (int i = 0; i < MAX_KNOWN; i++) {
     if (!knownDevices[i].used || !knownDevices[i].uid.length()) continue;

@@ -6,6 +6,19 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-01
+
+### Added
+
+- Wi-Fi認証情報、OSC送信先、画面回転、Web UI言語をLittleFSへ原子的に保存するシステム設定ファイルを追加
+- システム設定ファイルのサイズとLittleFSの総容量・使用量・空き容量をシリアルログへ出力
+
+### Changed
+
+- 共通設定の保存先をNVSからLittleFSへ変更
+- 初回起動時に既存NVSのWi-Fi、OSC、画面回転、Web UI言語をLittleFSへ自動移行
+- Wi-Fi設定の削除時はOSC送信先、画面回転、Web UI言語を維持
+
 ## [1.9.3]
 
 - Press／ReleaseのOSC Addressを、検証前に正規化する他のAddress処理と統一
@@ -213,7 +226,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.3...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/shimez/M5ChainOSC/compare/v1.9.3...v1.10.0
 [1.9.3]: https://github.com/shimez/M5ChainOSC/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/shimez/M5ChainOSC/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.9.1
