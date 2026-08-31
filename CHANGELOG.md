@@ -6,6 +6,11 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.9.3]
+
+- Press／ReleaseのOSC Addressを、検証前に正規化する他のAddress処理と統一
+- プリセットインポートエラーを、ChainOSCnanoと同様に対象デバイスカード内へ表示
+
 ## [1.9.2]
 
 ### Added
@@ -208,7 +213,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.2...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.9.3...HEAD
+[1.9.3]: https://github.com/shimez/M5ChainOSC/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/shimez/M5ChainOSC/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.9.1
 [1.9.0]: https://github.com/shimez/M5ChainOSC/releases/tag/v1.9.0
