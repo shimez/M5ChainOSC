@@ -6,6 +6,12 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-01
+
+### Added
+
+- Web UI最下段に、確認後に全設定を削除して再起動する赤色ボタンを追加
+
 ## [1.10.0] - 2026-09-01
 
 ### Added
@@ -226,7 +232,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/shimez/M5ChainOSC/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/shimez/M5ChainOSC/compare/v1.9.3...v1.10.0
 [1.9.3]: https://github.com/shimez/M5ChainOSC/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/shimez/M5ChainOSC/compare/v1.9.1...v1.9.2

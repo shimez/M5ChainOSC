@@ -650,6 +650,14 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
 // ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
+void handleDeleteAllSettings() {
+  server.send(200, "text/plain; charset=utf-8",
+              tr("All settings were deleted. Restarting.",
+                 "すべての設定を削除しました。再起動します。"));
+  delay(250);
+  resetAllSettings();
+}
+
 void registerWebRoutes() {
   const char* trackedHeaders[] = {"Accept-Language"};
   server.collectHeaders(trackedHeaders, 1);
@@ -658,6 +666,7 @@ void registerWebRoutes() {
   server.on("/save", HTTP_POST, handleSave);
   server.on("/delete_wifi", HTTP_POST, handleDeleteWifi);
   server.on("/delete_device", HTTP_POST, handleDeleteDevice);
+  server.on("/delete_all_settings", HTTP_POST, handleDeleteAllSettings);
   server.on("/set_rotation", HTTP_POST, handleSetRotation);
   server.on("/export_settings", HTTP_GET, handleExportSettings);
   server.on("/import_settings", HTTP_POST, handleImportSettings);
@@ -757,7 +766,7 @@ input.invalid,select.invalid{border:2px solid #c73c4a;background:#fff8f8}
 button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-radius:6px;font-size:16px;margin-top:8px}
 .save-bar{position:sticky;z-index:15;bottom:8px;display:flex;align-items:center;gap:12px;padding:10px 12px;margin-top:16px;background:rgba(255,255,255,.96);border:1px solid #dce2ea;border-radius:10px;box-shadow:0 5px 18px rgba(0,0,0,.14)}.save-bar button{flex:1;margin:0}.dirty-status{flex:0 0 auto;color:#a45a00;font-size:.9em;font-weight:bold}.dirty-status[hidden]{display:none}
 .toast{position:fixed;z-index:50;top:16px;left:50%;transform:translate(-50%,-12px);max-width:min(520px,calc(100% - 32px));padding:12px 18px;border-radius:9px;color:#fff;font-weight:bold;box-shadow:0 6px 22px rgba(0,0,0,.22);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}.toast.show{opacity:1;transform:translate(-50%,0)}.toast.success{background:#218838}.toast.error{background:#c73c4a}
-.btn-danger{background:#dc3545}.btn-warning{background:#ff9800}.btn-export{background:#3267e3}.btn-rot{background:#6f42c1;flex:1;margin:0}
+.btn-danger{background:#dc3545}.btn-warning{background:#ff9800}.btn-export{background:#3267e3}.btn-rot{background:#6f42c1;flex:1;margin:0}.danger-zone{margin-top:28px;border-left-color:#dc3545}.danger-zone button{margin:0;background:#dc3545}
 .device{position:relative}.device-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}.device-head h2{display:flex;align-items:center;gap:4px;margin-bottom:0}.collapse-button{width:30px;height:30px;margin:0 3px 0 0;padding:0;background:#f1f4f8;color:#42516a;border:1px solid #dce2ea;border-radius:7px;font-size:16px;line-height:1;transition:transform .15s}.collapse-button.collapsed{transform:rotate(-90deg)}.device-body[hidden]{display:none}.device-menu-wrap{position:relative;flex:0 0 auto}.more-button{width:34px;height:30px;margin:0;padding:0;background:#f1f4f8;color:#42516a;border:1px solid #dce2ea;border-radius:7px;font-size:18px;line-height:1}.device-menu{display:none;position:absolute;z-index:20;right:0;top:36px;width:235px;padding:8px;background:#fff;border:1px solid #dce2ea;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18)}.device-menu.open{display:block}.device-menu a,.device-menu button{display:block;box-sizing:border-box;width:100%;margin:0;padding:10px;text-align:left;text-decoration:none;border-radius:7px;background:#fff;color:#253550;border:0;font-size:14px}.device-menu a:hover,.device-menu button:hover{background:#edf3ff}.device-menu .menu-note{padding:6px 10px 8px;color:#7a8494;font-size:12px}.preset-status{min-height:20px;margin:9px 0 0;color:#526075;font-size:.9em}
 .btn-rot-cur{background:#9b59b6;font-weight:bold;box-shadow:inset 0 0 0 2px #fff}
 .rot-row{display:flex;gap:8px;margin-top:10px}
@@ -803,6 +812,7 @@ function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg
 let toastTimer;function showToast(message,success){let toast=document.getElementById('save-toast');toast.textContent=message;toast.className='toast '+(success?'success':'error')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),success?3000:6000)}
 async function saveSettings(event){event.preventDefault();if(!validateForm())return false;let form=event.currentTarget,button=form.querySelector('.save-bar button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));window.settingsSubmitting=true;button.disabled=true;button.textContent=tx('Saving...','保存中...');try{let response=await fetch('/save?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('Settings could not be saved.','設定を保存できませんでした。'));window.settingsDirty=false;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;showToast(message,true)}catch(error){showToast(error.message,false)}finally{window.settingsSubmitting=false;button.disabled=false;button.textContent=oldText}return false}
 async function deleteSavedDevice(event,form){event.preventDefault();if(!confirm(tx('Delete these settings?','この設定を削除しますか？')))return false;let button=form.querySelector('button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_device?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('The saved device settings could not be deleted.','保存済みデバイス設定を削除できませんでした。'));let card=form.closest('.saved-device-card');if(card)card.remove();showToast(message,true)}catch(error){button.disabled=false;button.textContent=oldText;showToast(error.message,false)}return false}
+async function deleteAllSettings(event){event.preventDefault();if(!confirm(tx('Delete all settings? This cannot be undone.','すべての設定を削除しますか？この操作は取り消せません。')))return false;window.settingsSubmitting=true;let button=event.currentTarget.querySelector('button');button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_all_settings',{method:'POST'}),message=await response.text();if(!response.ok)throw new Error(message);showToast(message,true)}catch(error){window.settingsSubmitting=false;button.disabled=false;button.textContent=tx('Delete All Settings','すべての設定を削除');showToast(error.message,false)}return false}
 function showImportError(status,reason){let message=tx('Import failed. The selected JSON file is not valid for this import.','インポートに失敗しました。選択したJSONファイルはこのインポートには使用できません。')+(reason?'\n\n'+reason:'');status.textContent=message.replace(/\n+/g,' ');alert(message)}
 async function importSettings(){let input=document.getElementById('import-file'),status=document.getElementById('import-status');if(!input.files.length)return;let file=input.files[0];if(file.size>49152){showImportError(status,tx('The JSON file is too large.','JSONファイルが大きすぎます。'));input.value='';return}if(!confirm(tx('Import the settings in this file? Matching device settings will be overwritten.','このファイルの設定をインポートしますか？同じデバイスの設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing...','インポート中...');try{let body=await file.text(),response=await fetch('/import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;setTimeout(()=>location.reload(),1000)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 function chooseSettingsFile(){document.getElementById('import-file').click()}
@@ -1037,6 +1047,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     html += "</div>";
     if (!flushHtml("SAVED_DEVICE_SENT")) return;
   }
+  html += "<div class='card danger-zone'><form method='POST' action='/delete_all_settings' onsubmit='deleteAllSettings(event);return false'><button class='btn-danger' type='submit'>" + String(tr("Delete All Settings", "すべての設定を削除")) + "</button></form></div>";
   html += "</main></body></html>";
   if (!flushHtml("FOOTER_SENT")) return;
   if (server.client().connected()) {
