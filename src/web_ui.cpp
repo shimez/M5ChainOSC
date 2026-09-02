@@ -680,15 +680,16 @@ void registerWebRoutes() {
 // ---------------------------------------------------------------------------
 void handleAPRoot() {
   applyBrowserLanguageOnFirstVisit();
-  String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>WiFi Setup</title></head><body>";
-  html += "<form method='POST' action='/set_language'><label>" + String(tr("Language", "言語")) + "</label><select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form>";
-  html += "<h2>" + String(tr("WiFi Setup", "Wi-Fi設定")) + "</h2>";
+  String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>M5ChainOSC Wi-Fi Setup</title><style>*{box-sizing:border-box}body{margin:0;padding:24px clamp(14px,4vw,56px);font-family:system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#10213b}main{max-width:720px;margin:auto}.card{margin-bottom:18px;padding:18px 20px;border-radius:13px;background:#fff;box-shadow:0 4px 18px #0002}label{display:block;font-weight:700;margin-top:10px}input,select{width:100%;margin-top:5px;padding:10px 12px;border:1px solid #aeb9c8;border-radius:3px;background:#fff;font-size:16px}button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:6px;background:#2563eb;color:#fff;font:inherit;font-size:16px}.language-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.language-row label{margin:0}.language-row form{min-width:150px}.language-row select{margin:0}.danger-zone{margin-top:28px}.danger-zone button{margin:0;background:#dc3545}.note{color:#68758a}.status{font-weight:bold}</style></head><body><main>";
+  html += "<div class='card language-row'><label>" + String(tr("Language", "言語")) + "</label><form method='POST' action='/set_language'><select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form></div>";
+  html += "<div class='card'><h2>" + String(tr("M5ChainOSC Wi-Fi Setup", "M5ChainOSC Wi-Fi設定")) + "</h2>";
   html += "<p role='alert' style='padding:12px;border:1px solid #d99b22;border-radius:8px;background:#fff4d6;color:#5f4300;font-weight:bold;line-height:1.5'>" + String(tr(
       "AtomS3R supports 2.4 GHz Wi-Fi only and cannot connect to 5 GHz-only networks. Select a 2.4 GHz SSID.",
       "AtomS3Rが接続できるWi-Fiは2.4 GHz帯のみです。5 GHz帯専用のSSIDには接続できません。2.4 GHz帯に対応するSSIDを選択してください。")) + "</p>";
   html += "<form method='POST' action='/save_wifi'>";
-  html += "SSID<input name='ssid'><br>" + String(tr("Password", "パスワード")) + "<input type='password' name='password'><br>";
-  html += "<button type='submit'>" + String(tr("Save & Restart", "保存して再起動")) + "</button></form></body></html>";
+  html += "<label>SSID<input name='ssid' maxlength='32' required></label><label>" + String(tr("Password", "パスワード")) + "<input type='password' name='password' maxlength='64'></label>";
+  html += "<button type='submit'>" + String(tr("Save & Restart", "保存して再起動")) + "</button></form></div>";
+  html += "<div class='card danger-zone'><p class='note'>" + String(tr("Delete Wi-Fi, OSC target, display rotation, UI language, and all device settings.", "Wi-Fi、OSC送信先、画面回転、UI言語、すべてのデバイス設定を削除します。")) + "</p><form method='POST' action='/delete_all_settings' onsubmit='deleteProvisioningSettings(event);return false'><button type='submit'>" + String(tr("Delete All Settings", "すべての設定を削除")) + "</button><p id='delete-status' class='status'></p></form></div><script>async function deleteProvisioningSettings(event){event.preventDefault();if(!confirm('" + String(tr("Delete Wi-Fi, OSC target, and all device settings? This cannot be undone. Continue?", "Wi-Fi、OSC送信先、すべてのデバイス設定を削除します。この操作は取り消せません。続行しますか？")) + "'))return;const form=event.currentTarget,button=form.querySelector('button'),status=document.getElementById('delete-status');button.disabled=true;button.textContent='" + String(tr("Deleting...", "削除中...")) + "';try{const response=await fetch('/delete_all_settings',{method:'POST'}),message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message}catch(error){status.textContent=error.message||'" + String(tr("Could not delete settings.", "設定を削除できませんでした。")) + "';button.disabled=false;button.textContent='" + String(tr("Delete All Settings", "すべての設定を削除")) + "'}}</script></main></body></html>";
   server.send(200, "text/html; charset=utf-8", html);
 }
 
@@ -839,7 +840,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
   html += "<div class='system-item'><strong>" + String(tr("Product", "製品名")) + "</strong><code>M5ChainOSC</code></div>";
   html += "<div class='system-item'><strong>Version</strong>" + String(APP_VERSION) + "</div>";
   html += "<div class='system-item'><strong>" + String(tr("IP Address", "IPアドレス")) + "</strong><code>" + htmlEscape(ipStr) + "</code></div>";
-  html += "<div class='system-item'><strong>mDNS</strong><code>http://atoms3r-osc.local/</code></div></div></div>";
+  html += "<div class='system-item'><strong>mDNS</strong><code>http://m5chainosc.local/</code></div></div></div>";
 
   html += "<div class='card'><h2>WiFi</h2><p class='meta'>IP: " + ipStr + "</p>";
   html += "<form action='/delete_wifi' method='POST' onsubmit=\"return confirm('" + String(tr("Delete WiFi settings?", "Wi-Fi設定を削除しますか？")) + "');\">";

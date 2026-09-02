@@ -72,7 +72,7 @@ PlatformIOでは`platformio.ini`の`lib_deps`から自動取得されます。Ar
 2. 初回起動時にスマートフォンまたはPCからWi-Fiアクセスポイント`AtomS3R-OSC`へ接続します。
 3. パスワード`12345678`を入力します。
 4. 表示されたWi-Fi設定画面で、普段使用するWi-FiのSSIDとパスワードを保存します。
-5. AtomS3Rの再起動後、画面に表示されたIPアドレス、または`http://atoms3r-osc.local/`をブラウザーで開きます。
+5. AtomS3Rの再起動後、画面に表示されたIPアドレス、または`http://m5chainosc.local/`をブラウザーで開きます。
 6. OSC送信先と各Chainデバイスを設定し、`Save All Settings`を押します。
 
 詳しい操作方法は[日本語ユーザーガイド](https://shimez.github.io/M5ChainOSC/user-guide/)または[English User Guide](https://shimez.github.io/M5ChainOSC/en/user-guide/)を参照してください。Markdown原稿は[docs/USER_GUIDE_ja.md](docs/USER_GUIDE_ja.md)と[docs/USER_GUIDE_en.md](docs/USER_GUIDE_en.md)にあります。

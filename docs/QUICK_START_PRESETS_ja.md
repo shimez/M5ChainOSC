@@ -66,7 +66,7 @@ AtomS3Rと同じネットワークに接続しているアダプターの`IPv4 A
 ## 5. M5ChainOSCの設定画面を開く
 
 1. 使用するChainデバイスをAtomS3Rへ接続します。
-2. AtomS3Rの画面に表示されたIPアドレス、または`http://atoms3r-osc.local/`をブラウザーで開きます。
+2. AtomS3Rの画面に表示されたIPアドレス、または`http://m5chainosc.local/`をブラウザーで開きます。
 3. `OSC Destination（OSC送信先）`の`Host IP`へ、手順4で確認したPCのIPアドレスを入力します。
 4. `Port`へVRChatの標準受信ポート`9000`を入力します。
 

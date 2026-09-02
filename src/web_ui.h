@@ -9,6 +9,7 @@ void handleSetLanguage();
 void handleSave();
 void handleDeleteWifi();
 void handleDeleteDevice();
+void handleDeleteAllSettings();
 void handleSetRotation();
 void handleExportSettings();
 void handleImportSettings();

@@ -64,7 +64,7 @@ Find the `IPv4 Address` of the Wi-Fi or Ethernet adapter connected to the same n
 ## 5. Open M5ChainOSC settings
 
 1. Connect the Chain device you want to use.
-2. Open the IP address shown on the AtomS3R, or `http://atoms3r-osc.local/`.
+2. Open the IP address shown on the AtomS3R, or `http://m5chainosc.local/`.
 3. Enter the computer's IPv4 address in `OSC Destination` → `Host IP`.
 4. Set `Port` to VRChat's standard receiving port, `9000`.
 

@@ -34,7 +34,7 @@ If connection fails, the device returns to access point mode. Check the SSID, pa
 From a device on the same network as the AtomS3R, open either:
 
 - The IP address shown on the AtomS3R display
-- `http://atoms3r-osc.local/`
+- `http://m5chainosc.local/`
 
 Some environments do not support mDNS `.local` addresses. Use the displayed IP address in that case.
 

@@ -11,8 +11,8 @@ unsigned long lastReconnectAttemptMs = 0;
 
 void startMdns() {
   if (mdnsRunning) MDNS.end();
-  mdnsRunning = MDNS.begin("atoms3r-osc");
-  hostStr = mdnsRunning ? "atoms3r-osc.local" : "(mDNS fail)";
+  mdnsRunning = MDNS.begin("m5chainosc");
+  hostStr = mdnsRunning ? "m5chainosc.local" : "(mDNS fail)";
 }
 }  // namespace
 
@@ -30,6 +30,7 @@ void startAPMode() {
   server.on("/", HTTP_GET, handleAPRoot);
   server.on("/set_language", HTTP_POST, handleSetLanguage);
   server.on("/save_wifi", HTTP_POST, handleSaveWiFi);
+  server.on("/delete_all_settings", HTTP_POST, handleDeleteAllSettings);
   server.onNotFound([]() { handleAPRoot(); });
   server.begin();
 
