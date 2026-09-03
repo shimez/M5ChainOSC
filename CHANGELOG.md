@@ -6,6 +6,17 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-09-03
+
+### Added
+
+- 通常Web UIとAP Modeのキャプティブポータルに、製品ポータルと同じfaviconを追加
+
+### Changed
+
+- Encoder、Joystick、Angle、ToFおよびクリック時Sequenceの入力中検証を強化
+- 数値範囲、不感帯、最大距離の警告表示を欄直下の赤色メッセージへ統一
+
 ## [1.11.1] - 2026-09-02
 
 ### Changed
@@ -242,7 +253,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.11.1...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.11.2...HEAD
+[1.11.2]: https://github.com/shimez/M5ChainOSC/compare/v1.11.1...v1.11.2
 [1.11.1]: https://github.com/shimez/M5ChainOSC/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/shimez/M5ChainOSC/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/shimez/M5ChainOSC/compare/v1.9.3...v1.10.0

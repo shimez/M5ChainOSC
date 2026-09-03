@@ -14,6 +14,15 @@
 #include <ArduinoJson.h>
 #include <esp_heap_caps.h>
 
+static const char M5CHAINOSC_FAVICON_LINK[] PROGMEM =
+    "<link rel='icon' type='image/svg+xml' href='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIHN0b3AtY29sb3I9IiMyOTIyNGYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwOTBkMTgiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0idXJsKCNiZykiLz4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9IiM5Njc0ZmYiIHN0cm9rZS13aWR0aD0iNS41Ij48cmVjdCB4PSI5IiB5PSIyMiIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiByeD0iOC41IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTggMjIuNSAzMC41KSIvPjxyZWN0IHg9IjI4IiB5PSIyMiIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiByeD0iOC41IiB0cmFuc2Zvcm09InJvdGF0ZSgxOCA0MS41IDMwLjUpIi8+PC9nPgo8L3N2Zz4K'>";
+
+static void addM5ChainOscFavicon(String& html) {
+  html.replace("<title>", String(FPSTR(M5CHAINOSC_FAVICON_LINK)) + "<title>");
+  if (html.indexOf("rel='icon'") < 0)
+    html.replace("</head>", String(FPSTR(M5CHAINOSC_FAVICON_LINK)) + "</head>");
+}
+
 #if M5CHAINOSC_WEB_PERF_DEBUG
 static uint32_t webPerfRequestSequence = 0;
 
@@ -104,6 +113,7 @@ static void sendUiResult(int status, const String& title, const String& message,
   String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") +
                 "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><h2>" +
                 htmlEscape(title) + "</h2><p>" + htmlEscape(message) + "</p>";
+  addM5ChainOscFavicon(html);
   if (showBack) html += "<p><a href='/'>" + String(tr("Back", "戻る")) + "</a></p>";
   html += "</body></html>";
   server.send(status, "text/html; charset=utf-8", html);
@@ -121,8 +131,12 @@ static void applyBrowserLanguageOnFirstVisit() {
 // ---------------------------------------------------------------------------
 // Small HTML helpers
 // ---------------------------------------------------------------------------
-static String typeSelectHtml(const String& name, ValueType cur) {
-  String s = "<select class='type' name='" + name + "'>";
+static String typeSelectHtml(const String& name, ValueType cur,
+                             bool validateMessage = false) {
+  String s = "<select class='type' name='" + name + "'";
+  if (validateMessage)
+    s += " onchange=\"validateInput(this.closest('.osc-row').querySelector('.msg-value'))\"";
+  s += ">";
   s += "<option value='0'" + String(cur == TYPE_FLOAT ? " selected" : "") + ">Float</option>";
   s += "<option value='1'" + String(cur == TYPE_INT ? " selected" : "") + ">Int</option>";
   s += "<option value='2'" + String(cur == TYPE_STRING ? " selected" : "") + ">String</option></select>";
@@ -152,7 +166,7 @@ static String messageRowHtml(const String& group, const String& prefix, const ch
   String row = "<div class='osc-row' data-group='" + group + "' data-prefix='" + prefix + "' data-event='" + eventName + "'>";
   row += "<div class='order'><button type='button' class='mv' onclick='moveMsg(this,-1)'>&uarr;</button><button type='button' class='mv' onclick='moveMsg(this,1)'>&darr;</button></div>";
   row += "<div class='field'><label>" + String(tr("OSC Address", "OSCアドレス")) + "</label><input class='msg-address' maxlength='192' name='" + p + "a_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.address) + "' oninput='limitAndValidate(this,192)'><small><span class='err'></span><span class='bytes'></span></small></div>";
-  row += "<div class='field'><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml(p + "t_" + idx + "_" + String(order), m.valueType) + "<small></small></div>";
+  row += "<div class='field'><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml(p + "t_" + idx + "_" + String(order), m.valueType, true) + "<small></small></div>";
   row += "<div class='field'><label>" + String(tr("Value", "値")) + "</label><input class='msg-value' maxlength='128' name='" + p + "v_" + idx + "_" + String(order) + "' value='" + htmlEscape(m.valueStr) + "' oninput='limitAndValidate(this,128)'><small><span class='err'></span><span class='bytes'></span></small></div>";
   row += "<button type='button' class='remove-msg' onclick='removeMsg(this)'>" + String(tr("Delete", "削除")) + "</button></div>";
   return row;
@@ -168,6 +182,29 @@ static String addressInputHtml(const String& label, const String& name,
          "' value='" + htmlEscape(value) +
          "' oninput='limitAndValidate(this,192)'><small><span class='err'></span>"
          "<span class='bytes'></span></small></div>";
+}
+
+static String finiteFloatInputHtml(const String& label, const String& name,
+                                   float value,
+                                   const String& extraClass = "") {
+  String classes = "numeric-field";
+  if (extraClass.length()) classes += " " + extraClass;
+  return "<div class='" + classes + "'><label>" + label +
+         "</label><input class='finite-float' type='number' step='any' name='" +
+         name + "' value='" + String(value) +
+         "' oninput='validateNumericInput(this)'><small class='numeric-error err'></small></div>";
+}
+
+static String boundedIntegerInputHtml(const String& label, const String& name,
+                                      int value, int minimum, int maximum,
+                                      const String& extraClass = "") {
+  String classes = "numeric-field";
+  if (extraClass.length()) classes += " " + extraClass;
+  return "<div class='" + classes + "'><label>" + label +
+         "</label><input class='bounded-integer' type='number' step='1' min='" +
+         String(minimum) + "' max='" + String(maximum) + "' name='" + name +
+         "' value='" + String(value) +
+         "' oninput='validateIntegerInput(this)'><small class='numeric-error err'></small></div>";
 }
 
 static String clickMessagesHtml(const String& idx, const String& prefix, bool sequenceMode,
@@ -217,8 +254,9 @@ static bool validOscMessage(OSCMessage& m, String& error) {
     return false;
   }
   if (m.valueType == TYPE_FLOAT) {
-    char* end = nullptr; float value = strtof(m.valueStr.c_str(), &end);
-    if (!end || end == m.valueStr.c_str() || *end != '\0' || !isfinite(value)) {
+    errno = 0; char* end = nullptr; float value = strtof(m.valueStr.c_str(), &end);
+    if (!end || end == m.valueStr.c_str() || *end != '\0' ||
+        errno == ERANGE || !isfinite(value)) {
       error = tr("E_OSC_FLOAT32_INVALID: The Float value is invalid. Specify a decimal number representable as a finite OSC float32.",
                  "E_OSC_FLOAT32_INVALID: Float値が正しくありません。有限のOSC float32として表現できる10進数を指定してください。");
       return false;
@@ -237,9 +275,27 @@ static bool validOscMessage(OSCMessage& m, String& error) {
 static bool parseFiniteFloatArg(const String& name, float& value) {
   if (!server.hasArg(name)) return false;
   const String text = server.arg(name);
+  if (!text.length()) return false;
+  errno = 0;
   char* end = nullptr;
   value = strtof(text.c_str(), &end);
-  return end && end != text.c_str() && *end == '\0' && isfinite(value);
+  return end && end != text.c_str() && *end == '\0' && errno != ERANGE &&
+         isfinite(value);
+}
+
+static bool parseBoundedIntegerArg(const String& name, int minimum,
+                                   int maximum, int& value) {
+  if (!server.hasArg(name)) return false;
+  const String text = server.arg(name);
+  if (!text.length()) return false;
+  errno = 0;
+  char* end = nullptr;
+  long parsed = strtol(text.c_str(), &end, 10);
+  if (!end || end == text.c_str() || *end != '\0' || errno == ERANGE ||
+      parsed < minimum || parsed > maximum)
+    return false;
+  value = static_cast<int>(parsed);
+  return true;
 }
 
 static bool parseSequenceForm(const String& addressName,
@@ -258,9 +314,19 @@ static bool parseSequenceForm(const String& addressName,
                "シーケンスの値が正しくありません。");
     return false;
   }
+  if (sequence.step == 0.0f) {
+    error = tr("E_SEQUENCE_STEP_ZERO: Sequence Step must not be zero. Specify a non-zero value that advances from Start toward End.",
+               "E_SEQUENCE_STEP_ZERO: SequenceのStepには0を指定できません。StartからEndへ進む0以外の値を指定してください。");
+    return false;
+  }
+  if ((sequence.start < sequence.end && sequence.step < 0.0f) ||
+      (sequence.start > sequence.end && sequence.step > 0.0f)) {
+    error = tr("E_SEQUENCE_DIRECTION_INVALID: Sequence Step advances in the wrong direction. Specify a Step that advances from Start toward End.",
+               "E_SEQUENCE_DIRECTION_INVALID: SequenceのStepの方向が正しくありません。StartからEndへ進む方向のStepを指定してください。");
+    return false;
+  }
   sequence.valueType = (ValueType)constrain(
       server.arg(typeName).toInt(), (int)TYPE_FLOAT, (int)TYPE_STRING);
-  normalizeSequence(sequence);
   return true;
 }
 
@@ -586,7 +652,9 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
       return presetFieldTypeInvalid(error);
     if (!jsonAddress(v["address"], device.angle.addr, error)) return false;
     device.angle.use12bit = v["use12bit"] | true; device.angle.deadband = v["deadband"] | 8;
-    if (device.angle.deadband < 1) return presetDeviceSettingInvalid(error);
+    if (device.angle.deadband < 1 ||
+        device.angle.deadband > (device.angle.use12bit ? 4095 : 255))
+      return presetDeviceSettingInvalid(error);
     if (!jsonRange(v["range"].as<JsonObjectConst>(), device.angle.map, error)) return false;
   } else if (device.type == CHAIN_JOYSTICK_TYPE_CODE) {
     if (!object.containsKey("joystick")) return presetRequiredFieldMissing(error);
@@ -681,6 +749,7 @@ void registerWebRoutes() {
 void handleAPRoot() {
   applyBrowserLanguageOnFirstVisit();
   String html = "<!doctype html><html lang='" + String(isJapaneseUi() ? "ja" : "en") + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>M5ChainOSC Wi-Fi Setup</title><style>*{box-sizing:border-box}body{margin:0;padding:24px clamp(14px,4vw,56px);font-family:system-ui,-apple-system,sans-serif;background:#f3f4f6;color:#10213b}main{max-width:720px;margin:auto}.card{margin-bottom:18px;padding:18px 20px;border-radius:13px;background:#fff;box-shadow:0 4px 18px #0002}label{display:block;font-weight:700;margin-top:10px}input,select{width:100%;margin-top:5px;padding:10px 12px;border:1px solid #aeb9c8;border-radius:3px;background:#fff;font-size:16px}button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:6px;background:#2563eb;color:#fff;font:inherit;font-size:16px}.language-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.language-row label{margin:0}.language-row form{min-width:150px}.language-row select{margin:0}.danger-zone{margin-top:28px}.danger-zone button{margin:0;background:#dc3545}.note{color:#68758a}.status{font-weight:bold}</style></head><body><main>";
+  addM5ChainOscFavicon(html);
   html += "<div class='card language-row'><label>" + String(tr("Language", "言語")) + "</label><form method='POST' action='/set_language'><select name='language' onchange='this.form.submit()'><option value='en'" + String(!isJapaneseUi() ? " selected" : "") + ">English</option><option value='ja'" + String(isJapaneseUi() ? " selected" : "") + ">日本語</option></select></form></div>";
   html += "<div class='card'><h2>" + String(tr("M5ChainOSC Wi-Fi Setup", "M5ChainOSC Wi-Fi設定")) + "</h2>";
   html += "<p role='alert' style='padding:12px;border:1px solid #d99b22;border-radius:8px;background:#fff4d6;color:#5f4300;font-weight:bold;line-height:1.5'>" + String(tr(
@@ -757,6 +826,7 @@ h1{font-size:1.4em}h2{margin-top:0;font-size:1.1em}
 label{display:block;margin-top:10px;font-weight:bold;font-size:.9em}
 input,select{width:100%;padding:8px;margin-top:4px;box-sizing:border-box}
 input.invalid,select.invalid{border:2px solid #c73c4a;background:#fff8f8}
+.sequence-error,.numeric-error{display:block;min-height:17px;color:#c73c4a;font-weight:normal}
 .key-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}.key-grid label{margin-top:0}
 .system-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}.system-item{padding:10px;background:#f8f9fa;border-radius:6px}.system-item strong{display:block;margin-bottom:5px;font-size:.9em}.system-item code{word-break:break-all}.status{padding:10px 12px;background:#edf3ff;color:#244da7;border:1px solid #cddbf8;border-radius:8px}
 .usage{display:flex;justify-content:space-between;align-items:center;margin:14px 0;padding:11px 13px;border:1px solid #cddbf8;border-radius:9px;background:#edf3ff;color:#244da7}
@@ -806,10 +876,17 @@ function removeMsg(btn){let r=btn.closest('.osc-row'),g=r.dataset.group;r.remove
 function addMsg(btn){let g=btn.dataset.group,prefix=btn.dataset.prefix,ev=btn.dataset.event;if(allRows(g).length>=MAX_MSG)return;let list=document.getElementById('list_'+ev+'_'+g),r=document.createElement('div');r.className='osc-row';r.dataset.group=g;r.dataset.prefix=prefix;r.dataset.event=ev;r.innerHTML='<div class="order"><button type="button" class="mv" onclick="moveMsg(this,-1)">&uarr;</button><button type="button" class="mv" onclick="moveMsg(this,1)">&darr;</button></div><div class="field"><label>'+tx('OSC Address','OSCアドレス')+'</label><input class="msg-address" maxlength="192" oninput="limitAndValidate(this,192)"><small><span class="err"></span><span class="bytes"></span></small></div><div class="field"><label>'+tx('Type','型')+'</label><select class="type" onchange="validateInput(this.closest(\'.osc-row\').querySelector(\'.msg-value\'))"><option value="0">Float</option><option value="1">Int</option><option value="2">String</option></select><small></small></div><div class="field"><label>'+tx('Value','値')+'</label><input class="msg-value" maxlength="128" value="1.0" oninput="limitAndValidate(this,128)"><small><span class="err"></span><span class="bytes"></span></small></div><button type="button" class="remove-msg" onclick="removeMsg(this)">'+tx('Delete','削除')+'</button>';list.appendChild(r);renumber(g);markDirty();r.querySelector('.msg-address').focus()}
 function limitBytes(i,max){while(bytes(i.value)>max)i.value=i.value.slice(0,-1)}
 function limitAndValidate(i,max){limitBytes(i,max);validateInput(i)}
-function validateInput(i){let isAddress=i.classList.contains('msg-address')||i.classList.contains('osc-address'),max=isAddress?192:128,b=bytes(i.value),err='';if(isAddress){if(!i.value)err=tx('Required','必須です');else if(i.value[0]!='/')err=tx('Start with /','/ から始めてください');else if(/[\s#*,?\[\]{}]/.test(i.value))err=tx('Invalid character','使用できない文字があります')}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value;if(t==='0'&&(!i.value.trim()||!Number.isFinite(Number(i.value))))err=tx('Invalid float','小数として正しくありません');if(t==='1'&&!/^[+-]?\d+$/.test(i.value.trim()))err=tx('Invalid integer','整数として正しくありません')}if(b>max)err=tx('Too long','長すぎます');i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
+function finiteFloatError(value,label){let text=value.trim(),number=Number(text),value32=Math.fround(number);if(!text||!Number.isFinite(number)||!Number.isFinite(value32)||(number!==0&&value32===0))return tx('Enter a finite '+label+' value representable as a 32-bit floating-point number',label+'には有限の32-bit浮動小数点数として表現できる値を入力してください');return ''}
+function validateNumericInput(input){let label=input.parentNode.querySelector('label'),name=label?label.textContent:tx('numeric','数値'),error=finiteFloatError(input.value,name),small=input.parentNode.querySelector('.numeric-error');input.classList.toggle('invalid',!!error);if(small)small.textContent=error;return !error}
+function validateIntegerInput(input){let label=input.parentNode.querySelector('label'),name=label?label.textContent:tx('Value','値'),text=input.value.trim(),minimum=Number(input.min),maximum=Number(input.max),valid=/^[+-]?\d+$/.test(text),number=valid?Number(text):NaN,error=valid&&Number.isSafeInteger(number)&&number>=minimum&&number<=maximum?'':tx(name+' must be an integer from '+minimum+' to '+maximum,name+'は'+minimum+'～'+maximum+'の整数で入力してください');input.classList.toggle('invalid',!!error);let small=input.parentNode.querySelector('.numeric-error');if(small)small.textContent=error;return !error}
+function updateAngleResolution(select){let card=select.closest('.ang'),input=card&&card.querySelector('.angle-deadband .bounded-integer');if(!input)return;input.max=select.value==='1'?'4095':'255';validateIntegerInput(input)}
+function validateInput(i){let isAddress=i.classList.contains('msg-address')||i.classList.contains('osc-address'),max=isAddress?192:128,b=bytes(i.value),err='';if(isAddress){if(!i.value)err=tx('Required','必須です');else if(i.value[0]!='/'||/[\s#*,?\[\]{}]/.test(i.value))err=tx('OSC Address must start with `/` and must not contain whitespace or `# * , ? [ ] { }`.','OSCアドレスは「/」から始め、空白および # * , ? [ ] { } を含めないでください。')}else if(i.classList.contains('msg-value')){let t=i.closest('.osc-row').querySelector('.type').value,v=i.value.trim();if(t==='0'){let n=Number(v),f=Math.fround(n);if(!v||!Number.isFinite(n)||!Number.isFinite(f)||(n!==0&&f===0))err=tx('Enter a finite value representable as OSC float32','有限のOSC float32として表現できる値を入力してください')}if(t==='1'){if(!/^[+-]?\d+$/.test(v))err=tx('Enter a decimal OSC int32','OSC int32の10進整数を入力してください');else{let n=BigInt(v);if(n<-2147483648n||n>2147483647n)err=tx('Int must be between -2147483648 and 2147483647','Intは-2147483648～2147483647の範囲で入力してください')}}}if(b>max)err=tx('Too long','長すぎます');i.classList.toggle('invalid',!!err);let sm=i.parentNode.querySelector('small');sm.querySelector('.err').textContent=err;sm.querySelector('.bytes').textContent=b+' / '+max+' bytes';return !err}
+function sequenceFieldError(input,error){let small=input.parentNode.querySelector('.numeric-error')||input.parentNode.querySelector('.sequence-error');if(!small){small=document.createElement('small');small.className='sequence-error err';input.parentNode.appendChild(small)}small.textContent=error;input.classList.toggle('invalid',!!error);return !error}
+function validateSequence(box){let fields=box.querySelectorAll('input[type=number]'),ok=true;if(fields.length<3)return true;let start=Number(fields[0].value),end=Number(fields[1].value),step=Number(fields[2].value),startError=finiteFloatError(fields[0].value,tx('Start','開始値')),endError=finiteFloatError(fields[1].value,tx('End','終了値')),stepError=finiteFloatError(fields[2].value,tx('Step','増減量'));if(!sequenceFieldError(fields[0],startError))ok=false;if(!sequenceFieldError(fields[1],endError))ok=false;if(!stepError&&step===0)stepError=tx('Step must not be zero','増減量には0を指定できません');if(!startError&&!endError&&!stepError&&((start<end&&step<0)||(start>end&&step>0)))stepError=tx('Step must advance from Start toward End','増減量が開始値から終了値へ進む方向になっていません');if(!sequenceFieldError(fields[2],stepError))ok=false;return ok}
+document.addEventListener('input',event=>{let box=event.target.closest&&event.target.closest('.sequence-card');if(box&&event.target.matches('input[type=number]'))validateSequence(box)})
 function initializeMessageRows(){let groups=new Set();document.querySelectorAll('.osc-row').forEach(row=>{groups.add(row.dataset.group);validateInput(row.querySelector('.msg-address'));validateInput(row.querySelector('.msg-value'))});document.querySelectorAll('.add-msg[data-group]').forEach(button=>groups.add(button.dataset.group));groups.forEach(group=>renumber(group));document.querySelectorAll('.osc-address').forEach(validateInput)}
 function rememberScroll(){sessionStorage.setItem('m5osc-scroll',String(window.scrollY))}
-function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC fields.','赤く表示されたOSC設定項目を修正してください。'))}return ok}
+function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});document.querySelectorAll('.finite-float').forEach(i=>{if(!i.closest('.sequence-card')&&!validateNumericInput(i))ok=false});document.querySelectorAll('.bounded-integer').forEach(i=>{if(!validateIntegerInput(i))ok=false});document.querySelectorAll('.sequence-card').forEach(box=>{if(!validateSequence(box))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC fields.','赤く表示されたOSC設定項目を修正してください。'))}return ok}
 let toastTimer;function showToast(message,success){let toast=document.getElementById('save-toast');toast.textContent=message;toast.className='toast '+(success?'success':'error')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),success?3000:6000)}
 async function saveSettings(event){event.preventDefault();if(!validateForm())return false;let form=event.currentTarget,button=form.querySelector('.save-bar button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));window.settingsSubmitting=true;button.disabled=true;button.textContent=tx('Saving...','保存中...');try{let response=await fetch('/save?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('Settings could not be saved.','設定を保存できませんでした。'));window.settingsDirty=false;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;showToast(message,true)}catch(error){showToast(error.message,false)}finally{window.settingsSubmitting=false;button.disabled=false;button.textContent=oldText}return false}
 async function deleteSavedDevice(event,form){event.preventDefault();if(!confirm(tx('Delete these settings?','この設定を削除しますか？')))return false;let button=form.querySelector('button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_device?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('The saved device settings could not be deleted.','保存済みデバイス設定を削除できませんでした。'));let card=form.closest('.saved-device-card');if(card)card.remove();showToast(message,true)}catch(error){button.disabled=false;button.textContent=oldText;showToast(error.message,false)}return false}
@@ -828,6 +905,8 @@ function initializePage(){let form=document.getElementById('settings-form');if(f
 window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListener('pageshow',()=>window.settingsSubmitting=false);window.addEventListener('beforeunload',e=>{if(window.settingsDirty&&!window.settingsSubmitting){e.preventDefault();e.returnValue=''}});window.addEventListener('DOMContentLoaded',initializePage)
 </script></head><body><main><div id='save-toast' class='toast' role='status' aria-live='polite'></div><h1>M5ChainOSC Settings</h1>
 )raw";
+
+  addM5ChainOscFavicon(html);
 
   html.replace("__LANG__", isJapaneseUi() ? "ja" : "en");
   html.replace("__JA__", isJapaneseUi() ? "true" : "false");
@@ -866,7 +945,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
   }
   html += "</div></div>";
 
-  html += "<form id='settings-form' action='/save' method='POST' onsubmit='saveSettings(event);return false'><div class='card'><h2>" + String(tr("OSC Destination", "OSC送信先")) + "</h2>";
+  html += "<form id='settings-form' action='/save' method='POST' novalidate onsubmit='saveSettings(event);return false'><div class='card'><h2>" + String(tr("OSC Destination", "OSC送信先")) + "</h2>";
   html += "<label>" + String(tr("Hostname or IPv4 address", "ホスト名またはIPv4アドレス")) + "</label><input name='host' value='" + htmlEscape(osc_host) + "'>";
   html += "<label>" + String(tr("UDP Port", "UDPポート")) + "</label><input type='number' name='port' value='" + String(osc_port) + "'></div>";
 
@@ -943,9 +1022,9 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<div id='ksq_" + idx + "' class='sequence-card' style='display:" + String(isSeq ? "block" : "none") + "'><h3>" + String(tr("Advance the value on each press", "押すたびに値を進める")) + "</h3><p class='note'>" + String(tr("Move from Start by Step and return to Start after End.", "開始値から増減量ずつ進み、終了値を超えると開始値へ戻ります。")) + "</p><div class='seq-grid'>";
       html += addressInputHtml(tr("OSC Address", "OSCアドレス"), "sa_" + idx,
                                devices[i].seq.address, "seq-address");
-      html += "<div><label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='ss_" + idx + "' value='" + String(devices[i].seq.start) + "'></div>";
-      html += "<div><label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='se_" + idx + "' value='" + String(devices[i].seq.end) + "'></div>";
-      html += "<div><label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='sp_" + idx + "' value='" + String(devices[i].seq.step) + "'></div>";
+      html += finiteFloatInputHtml(tr("Start", "開始値"), "ss_" + idx, devices[i].seq.start);
+      html += finiteFloatInputHtml(tr("End", "終了値"), "se_" + idx, devices[i].seq.end);
+      html += finiteFloatInputHtml(tr("Step", "増減量"), "sp_" + idx, devices[i].seq.step);
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
       html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong><div class='encoder-grid'>";
@@ -955,31 +1034,31 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += "<div><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
       html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
       const String absoluteHiddenClass = devices[i].enc.sendIncrement ? " encoder-mode-hidden" : "";
-      html += "<div class='encoder-absolute-setting" + absoluteHiddenClass + "'><label>" + String(tr("Abs In Min", "絶対値入力の最小値")) + "</label><input type='number' step='any' name='e0_" + idx + "' value='" + String(devices[i].enc.absInMin) + "'></div>";
-      html += "<div class='encoder-absolute-setting" + absoluteHiddenClass + "'><label>" + String(tr("Abs In Max", "絶対値入力の最大値")) + "</label><input type='number' step='any' name='e1_" + idx + "' value='" + String(devices[i].enc.absInMax) + "'></div>";
-      html += "<div><label>" + String(tr("Inc Scale", "増分倍率")) + "</label><input type='number' step='any' name='es_" + idx + "' value='" + String(devices[i].enc.incScale) + "'></div>";
-      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='eo_" + idx + "' value='" + String(devices[i].enc.map.outMin) + "'></div>";
-      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='eO_" + idx + "' value='" + String(devices[i].enc.map.outMax) + "'></div>";
+      html += finiteFloatInputHtml(tr("Abs In Min", "絶対値入力の最小値"), "e0_" + idx, devices[i].enc.absInMin, "encoder-absolute-setting" + absoluteHiddenClass);
+      html += finiteFloatInputHtml(tr("Abs In Max", "絶対値入力の最大値"), "e1_" + idx, devices[i].enc.absInMax, "encoder-absolute-setting" + absoluteHiddenClass);
+      html += finiteFloatInputHtml(tr("Inc Scale", "増分倍率"), "es_" + idx, devices[i].enc.incScale);
+      html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "eo_" + idx, devices[i].enc.map.outMin);
+      html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "eO_" + idx, devices[i].enc.map.outMax);
       html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div></div></div>";
       html += "<div class='click-section encoder-click'>";
       html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
-      html += "<div id='esq_" + idx + "' class='click-sequence' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
+      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong><div class='seq-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "ek_" + idx,
-                               devices[i].enc.clickSeq.address);
-      html += "<label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='en_" + idx + "' value='" + String(devices[i].enc.clickSeq.start) + "'>";
-      html += "<label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='e2_" + idx + "' value='" + String(devices[i].enc.clickSeq.end) + "'>";
-      html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='e3_" + idx + "' value='" + String(devices[i].enc.clickSeq.step) + "'>";
-      html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div>";
+                               devices[i].enc.clickSeq.address, "seq-address");
+      html += finiteFloatInputHtml(tr("Start", "開始値"), "en_" + idx, devices[i].enc.clickSeq.start);
+      html += finiteFloatInputHtml(tr("End", "終了値"), "e2_" + idx, devices[i].enc.clickSeq.end);
+      html += finiteFloatInputHtml(tr("Step", "増減量"), "e3_" + idx, devices[i].enc.clickSeq.step);
+      html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div></div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong><div class='angle-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "aa_" + idx,
                                devices[i].angle.addr, "angle-address");
-      html += "<div><label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
+      html += "<div><label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "' onchange='updateAngleResolution(this)'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
       html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select></div>";
-      html += "<div><label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='ad_" + idx + "' value='" + String(devices[i].angle.deadband) + "'></div>";
-      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='ao_" + idx + "' value='" + String(devices[i].angle.map.outMin) + "'></div>";
-      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='aO_" + idx + "' value='" + String(devices[i].angle.map.outMax) + "'></div>";
+      html += boundedIntegerInputHtml(tr("Deadband", "不感帯"), "ad_" + idx, devices[i].angle.deadband, 1, devices[i].angle.use12bit ? 4095 : 255, "angle-deadband");
+      html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "ao_" + idx, devices[i].angle.map.outMin);
+      html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "aO_" + idx, devices[i].angle.map.outMax);
       html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
       html += "<div class='joy'><strong>" + String(tr("Joystick XY", "ジョイスティック XY")) + "</strong><div class='joystick-grid'>";
@@ -989,31 +1068,31 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
                                devices[i].joy.yAddr, "joystick-address");
       html += "<div class='joystick-invert'><label><input type='checkbox' name='jix_" + idx + "' value='1'" + String(devices[i].joy.invertX ? " checked" : "") + "><span>" + String(tr("Invert X (+/-)", "X軸反転 (+/-)")) + "</span></label>";
       html += "<label><input type='checkbox' name='jiy_" + idx + "' value='1'" + String(devices[i].joy.invertY ? " checked" : "") + "><span>" + String(tr("Invert Y (+/-)", "Y軸反転 (+/-)")) + "</span></label></div>";
-      html += "<div><label>" + String(tr("Deadband", "不感帯")) + "</label><input type='number' name='jd_" + idx + "' value='" + String(devices[i].joy.deadband) + "'></div>";
-      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='jo_" + idx + "' value='" + String(devices[i].joy.map.outMin) + "'></div>";
-      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='jO_" + idx + "' value='" + String(devices[i].joy.map.outMax) + "'></div>";
+      html += boundedIntegerInputHtml(tr("Deadband", "不感帯"), "jd_" + idx, devices[i].joy.deadband, 1, 254);
+      html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "jo_" + idx, devices[i].joy.map.outMin);
+      html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "jO_" + idx, devices[i].joy.map.outMax);
       html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div></div></div>";
       html += "<div class='click-section joystick-click'>";
       html += clickModeHtml("jm_" + idx, devices[i].joy.clickMode, "jpr_" + idx, "jsq_" + idx);
       html += clickMessagesHtml(idx,"j",joySeq,devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount);
-      html += "<div id='jsq_" + idx + "' class='click-sequence' style='display:" + String(joySeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong>";
+      html += "<div id='jsq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(joySeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong><div class='seq-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "jk_" + idx,
-                               devices[i].joy.clickSeq.address);
-      html += "<label>" + String(tr("Start", "開始値")) + "</label><input type='number' step='any' name='jn_" + idx + "' value='" + String(devices[i].joy.clickSeq.start) + "'>";
-      html += "<label>" + String(tr("End", "終了値")) + "</label><input type='number' step='any' name='j2_" + idx + "' value='" + String(devices[i].joy.clickSeq.end) + "'>";
-      html += "<label>" + String(tr("Step", "増減量")) + "</label><input type='number' step='any' name='j3_" + idx + "' value='" + String(devices[i].joy.clickSeq.step) + "'>";
-      html += "<label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div>";
+                               devices[i].joy.clickSeq.address, "seq-address");
+      html += finiteFloatInputHtml(tr("Start", "開始値"), "jn_" + idx, devices[i].joy.clickSeq.start);
+      html += finiteFloatInputHtml(tr("End", "終了値"), "j2_" + idx, devices[i].joy.clickSeq.end);
+      html += finiteFloatInputHtml(tr("Step", "増減量"), "j3_" + idx, devices[i].joy.clickSeq.step);
+      html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div></div></div>";
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
       html += "<div class='ang'><strong>" + String(tr("ToF Distance (mm)", "ToF距離 (mm)")) + "</strong><div class='tof-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "fa_" + idx,
                                devices[i].tof.addr, "tof-address");
-      html += "<div><label>" + String(tr("Deadband (mm)", "不感帯 (mm)")) + "</label><input type='number' name='fd_" + idx + "' value='" + String(devices[i].tof.deadband) + "'></div>";
-      html += "<div><label>" + String(tr("Maximum Distance (mm)", "最大距離 (mm)")) + "</label><input type='number' min='31' max='2000' name='fm_" + idx + "' value='" + String(devices[i].tof.maxDistanceMm) + "'></div>";
+      html += boundedIntegerInputHtml(tr("Deadband (mm)", "不感帯 (mm)"), "fd_" + idx, devices[i].tof.deadband, 1, 2000);
+      html += boundedIntegerInputHtml(tr("Maximum Distance (mm)", "最大距離 (mm)"), "fm_" + idx, devices[i].tof.maxDistanceMm, 31, 2000);
       html += "<div><label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
       html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Min / Far → Out Max", "近い → 出力最小値／遠い → 出力最大値")) + "</option>";
       html += "<option value='1'" + String(devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Max / Far → Out Min", "近い → 出力最大値／遠い → 出力最小値")) + "</option></select></div>";
-      html += "<div><label>" + String(tr("Out Min", "出力最小値")) + "</label><input type='number' step='any' name='fo_" + idx + "' value='" + String(devices[i].tof.map.outMin) + "'></div>";
-      html += "<div><label>" + String(tr("Out Max", "出力最大値")) + "</label><input type='number' step='any' name='fO_" + idx + "' value='" + String(devices[i].tof.map.outMax) + "'></div>";
+      html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "fo_" + idx, devices[i].tof.map.outMin);
+      html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "fO_" + idx, devices[i].tof.map.outMax);
       html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType) + "</div>";
       html += "<p class='note tof-address'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、最大距離未満です。範囲外ではOSC送信を停止します。")) + "</p></div></div>";
     } else {
@@ -1146,11 +1225,16 @@ void handleSave() {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Rotation Address: ", "エンコーダー回転OSCアドレス: ")) + validationError); return;
       }
       if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
-      if (server.hasArg("e0_" + idx)) candidate.absInMin = server.arg("e0_" + idx).toFloat();
-      if (server.hasArg("e1_" + idx)) candidate.absInMax = server.arg("e1_" + idx).toFloat();
-      if (server.hasArg("es_" + idx)) candidate.incScale = server.arg("es_" + idx).toFloat();
-      if (server.hasArg("eo_" + idx)) candidate.map.outMin = server.arg("eo_" + idx).toFloat();
-      if (server.hasArg("eO_" + idx)) candidate.map.outMax = server.arg("eO_" + idx).toFloat();
+      if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
+          !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
+          !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
+          !parseFiniteFloatArg("eo_" + idx, candidate.map.outMin) ||
+          !parseFiniteFloatArg("eO_" + idx, candidate.map.outMax)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("Encoder rotation values must be finite values representable as 32-bit floating-point numbers.",
+                        "エンコーダー回転の数値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+        return;
+      }
       if (server.hasArg("et_" + idx)) candidate.map.outType = (ValueType)server.arg("et_" + idx).toInt();
       if (server.hasArg("em_" + idx)) candidate.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
       if (!parseMessageList(idx,"e",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
@@ -1171,9 +1255,24 @@ void handleSave() {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Angle Address: ", "Angle OSCアドレス: ")) + validationError); return;
       }
       if (server.hasArg("a1_" + idx)) candidate.use12bit = server.arg("a1_" + idx).toInt() != 0;
-      if (server.hasArg("ad_" + idx)) candidate.deadband = server.arg("ad_" + idx).toInt();
-      if (server.hasArg("ao_" + idx)) candidate.map.outMin = server.arg("ao_" + idx).toFloat();
-      if (server.hasArg("aO_" + idx)) candidate.map.outMax = server.arg("aO_" + idx).toFloat();
+      if (!parseBoundedIntegerArg("ad_" + idx, 1,
+                                  candidate.use12bit ? 4095 : 255,
+                                  candidate.deadband)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     candidate.use12bit
+                         ? tr("Angle Deadband must be an integer from 1 to 4095 in 12-bit mode.",
+                              "Angleの不感帯は12-bitモードでは1～4095の整数で入力してください。")
+                         : tr("Angle Deadband must be an integer from 1 to 255 in 8-bit mode.",
+                              "Angleの不感帯は8-bitモードでは1～255の整数で入力してください。"));
+        return;
+      }
+      if (!parseFiniteFloatArg("ao_" + idx, candidate.map.outMin) ||
+          !parseFiniteFloatArg("aO_" + idx, candidate.map.outMax)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("Angle output values must be finite values representable as 32-bit floating-point numbers.",
+                        "Angleの出力値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+        return;
+      }
       if (server.hasArg("at_" + idx)) candidate.map.outType = (ValueType)server.arg("at_" + idx).toInt();
       devices[i].angle = candidate;
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
@@ -1188,11 +1287,22 @@ void handleSave() {
       if (!validOscAddressText(candidate.yAddr, validationError)) {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Joystick Y Address: ", "Joystick Y軸OSCアドレス: ")) + validationError); return;
       }
-      if (server.hasArg("jd_" + idx)) candidate.deadband = server.arg("jd_" + idx).toInt();
+      if (!parseBoundedIntegerArg("jd_" + idx, 1, 254,
+                                  candidate.deadband)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("Joystick Deadband must be an integer from 1 to 254.",
+                        "Joystickの不感帯は1～254の整数で入力してください。"));
+        return;
+      }
       candidate.invertX = server.hasArg("jix_" + idx);
       candidate.invertY = server.hasArg("jiy_" + idx);
-      if (server.hasArg("jo_" + idx)) candidate.map.outMin = server.arg("jo_" + idx).toFloat();
-      if (server.hasArg("jO_" + idx)) candidate.map.outMax = server.arg("jO_" + idx).toFloat();
+      if (!parseFiniteFloatArg("jo_" + idx, candidate.map.outMin) ||
+          !parseFiniteFloatArg("jO_" + idx, candidate.map.outMax)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("Joystick output values must be finite values representable as 32-bit floating-point numbers.",
+                        "Joystickの出力値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+        return;
+      }
       if (server.hasArg("jt_" + idx)) candidate.map.outType = (ValueType)server.arg("jt_" + idx).toInt();
       if (server.hasArg("jm_" + idx)) candidate.clickMode = (KeyMode)server.arg("jm_" + idx).toInt();
       if (!parseMessageList(idx,"j",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
@@ -1212,15 +1322,23 @@ void handleSave() {
       if (!validOscAddressText(candidate.addr, validationError)) {
         sendUiResult(400, tr("Save error", "保存エラー"), String("ToF Address: ") + validationError); return;
       }
-      if (server.hasArg("fd_" + idx)) candidate.deadband = server.arg("fd_" + idx).toInt();
-      if (server.hasArg("fm_" + idx)) candidate.maxDistanceMm = server.arg("fm_" + idx).toInt();
-      candidate.nearValueHigh = server.hasArg("fi_" + idx) && server.arg("fi_" + idx).toInt() != 0;
-      if (candidate.deadband < 1 || candidate.deadband > 2000 ||
-          candidate.maxDistanceMm < 31 || candidate.maxDistanceMm > 2000) {
-        sendUiResult(400, tr("Save error", "保存エラー"), tr("ToF Maximum Distance must be 31–2000 mm and Deadband must be 1–2000 mm.", "ToFの最大距離は31～2000 mm、不感帯は1～2000 mmに設定してください。")); return;
+      if (!parseBoundedIntegerArg("fd_" + idx, 1, 2000,
+                                  candidate.deadband) ||
+          !parseBoundedIntegerArg("fm_" + idx, 31, 2000,
+                                  candidate.maxDistanceMm)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("ToF Maximum Distance must be an integer from 31 to 2000 mm and Deadband must be an integer from 1 to 2000 mm.",
+                        "ToFの最大距離は31～2000 mm、不感帯は1～2000 mmの整数で入力してください。"));
+        return;
       }
-      if (server.hasArg("fo_" + idx)) candidate.map.outMin = server.arg("fo_" + idx).toFloat();
-      if (server.hasArg("fO_" + idx)) candidate.map.outMax = server.arg("fO_" + idx).toFloat();
+      candidate.nearValueHigh = server.hasArg("fi_" + idx) && server.arg("fi_" + idx).toInt() != 0;
+      if (!parseFiniteFloatArg("fo_" + idx, candidate.map.outMin) ||
+          !parseFiniteFloatArg("fO_" + idx, candidate.map.outMax)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("ToF output values must be finite values representable as 32-bit floating-point numbers.",
+                        "ToFの出力値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+        return;
+      }
       if (server.hasArg("ft_" + idx)) {
         int t = server.arg("ft_" + idx).toInt();
         candidate.map.outType = (t == TYPE_INT) ? TYPE_INT : TYPE_FLOAT;
