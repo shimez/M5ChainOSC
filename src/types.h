@@ -34,6 +34,7 @@ struct RangeMap {
 struct EncoderOscConfig {
   String         rotAddr       = "/avatar/parameters/Encoder";
   bool           sendIncrement = false;
+  bool           wrapAround    = true;
   float          absInMin      = 0;
   float          absInMax      = 20;
   float          incScale      = 0.05f;
@@ -109,6 +110,8 @@ struct ChainDevice {
   uint8_t lastButtonStatus = 0;
   int16_t lastEncAbs       = 0;
   bool    encInited        = false;
+  float   boundedEncAbs    = 0;
+  bool    boundedEncInited = false;
   int     lastAngle        = -99999;
   int16_t lastJoyX         = 0;
   int16_t lastJoyY         = 0;

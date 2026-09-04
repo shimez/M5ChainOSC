@@ -314,7 +314,7 @@ static bool readMessageList(const String& blob, int& pos, OSCMessage* press,
 static String serializeTypedDeviceConfig(const ChainDevice& d) {
   String out;
   out.reserve(256);
-  appendField(out, String("D1")); appendField(out, d.uid);
+  appendField(out, String("D2")); appendField(out, d.uid);
   appendField(out, (int)d.type); appendField(out, d.displayName);
   if (d.type == CHAIN_KEY_TYPE_CODE) {
     appendField(out, (int)d.mode); appendField(out, d.seq.address);
@@ -323,6 +323,7 @@ static String serializeTypedDeviceConfig(const ChainDevice& d) {
     appendMessageList(out, d.pressMessages, d.pressMessageCount, d.releaseMessages, d.releaseMessageCount);
   } else if (d.type == CHAIN_ENCODER_TYPE_CODE) {
     appendField(out, d.enc.rotAddr); appendField(out, d.enc.sendIncrement ? 1 : 0);
+    appendField(out, d.enc.wrapAround ? 1 : 0);
     appendField(out, d.enc.absInMin); appendField(out, d.enc.absInMax); appendField(out, d.enc.incScale);
     appendField(out, d.enc.map.outMin); appendField(out, d.enc.map.outMax); appendField(out, (int)d.enc.map.outType);
     appendField(out, (int)d.enc.clickMode); appendField(out, d.enc.clickSeq.address);
@@ -355,7 +356,8 @@ static bool applyTypedDeviceConfig(ChainDevice& d, const String& blob) {
   ChainDevice& candidate = d;
   int pos = 0;
   auto field = [&]() { return nextField(blob, pos); };
-  if (field() != "D1" || field() != d.uid) return false;
+  const String format = field();
+  if ((format != "D1" && format != "D2") || field() != d.uid) return false;
   chain_device_type_t storedType = (chain_device_type_t)field().toInt();
   if (storedType != d.type && d.type != CHAIN_UNKNOWN_TYPE_CODE) return false;
   candidate.type = storedType; candidate.displayName = field();
@@ -373,6 +375,7 @@ static bool applyTypedDeviceConfig(ChainDevice& d, const String& blob) {
     normalizeSequence(candidate.seq);
   } else if (storedType == CHAIN_ENCODER_TYPE_CODE) {
     candidate.enc.rotAddr = field(); candidate.enc.sendIncrement = field().toInt() != 0;
+    candidate.enc.wrapAround = format == "D2" ? field().toInt() != 0 : true;
     candidate.enc.absInMin = field().toFloat(); candidate.enc.absInMax = field().toFloat(); candidate.enc.incScale = field().toFloat();
     candidate.enc.map.outMin = field().toFloat(); candidate.enc.map.outMax = field().toFloat();
     int encoderOutputType = field().toInt();

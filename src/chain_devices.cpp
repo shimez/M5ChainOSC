@@ -72,9 +72,21 @@ void pollEncoder(ChainDevice& d) {
         float span = d.enc.absInMax - d.enc.absInMin;
         float x = (float)absv;
         if (fabsf(span) > 1e-6f) {
-          x = fmodf(x - d.enc.absInMin, span);
-          if (x < 0) x += span;
-          x += d.enc.absInMin;
+          if (d.enc.wrapAround) {
+            d.boundedEncInited = false;
+            x = fmodf(x - d.enc.absInMin, span);
+            if (x < 0) x += span;
+            x += d.enc.absInMin;
+          } else {
+            if (!d.boundedEncInited) {
+              d.boundedEncAbs = clampf(x, d.enc.absInMin, d.enc.absInMax);
+              d.boundedEncInited = true;
+            } else {
+              d.boundedEncAbs = clampf(d.boundedEncAbs + delta,
+                                      d.enc.absInMin, d.enc.absInMax);
+            }
+            x = d.boundedEncAbs;
+          }
         }
         mapped = mapClamped(x, d.enc.absInMin, d.enc.absInMax,
                             d.enc.map.outMin, d.enc.map.outMax);

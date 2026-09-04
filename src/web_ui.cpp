@@ -417,6 +417,7 @@ static String deviceJson(const ChainDevice& device, bool includeIdentity = true)
   } else if (device.type == CHAIN_ENCODER_TYPE_CODE) {
     out += ",\"encoder\":{\"rotationAddress\":" + jsonString(device.enc.rotAddr) +
            ",\"sendIncrement\":" + String(device.enc.sendIncrement ? "true" : "false") +
+           ",\"wrapAround\":" + String(device.enc.wrapAround ? "true" : "false") +
            ",\"absoluteInputMin\":" + String(device.enc.absInMin, 6) +
            ",\"absoluteInputMax\":" + String(device.enc.absInMax, 6) +
            ",\"incrementScale\":" + String(device.enc.incScale, 6) +
@@ -620,6 +621,7 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
     if (!hasRequiredPresetFields(v, required, 10, error)) return false;
     if (!v["rotationAddress"].is<const char*>() ||
         !v["sendIncrement"].is<bool>() ||
+        (v.containsKey("wrapAround") && !v["wrapAround"].is<bool>()) ||
         !v["absoluteInputMin"].is<float>() ||
         !v["absoluteInputMax"].is<float>() ||
         !v["incrementScale"].is<float>() || !v["range"].is<JsonObjectConst>() ||
@@ -629,6 +631,8 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
       return presetFieldTypeInvalid(error);
     if (!jsonAddress(v["rotationAddress"], device.enc.rotAddr, error)) return false;
     device.enc.sendIncrement = v["sendIncrement"] | false;
+    device.enc.wrapAround = v["wrapAround"] | true;
+    device.boundedEncInited = false;
     device.enc.absInMin = v["absoluteInputMin"].as<float>(); device.enc.absInMax = v["absoluteInputMax"].as<float>();
     device.enc.incScale = v["incrementScale"].as<float>();
     if (!isfinite(device.enc.absInMin) || !isfinite(device.enc.absInMax) ||
@@ -845,7 +849,7 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .release{border-left:5px solid #007bff;padding-left:10px;margin-top:12px}
 .seq{border-left:5px solid #20c997;padding-left:10px;margin-top:12px}
 .click-sequence{padding:10px;margin-top:12px}
-.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{visibility:hidden;pointer-events:none}
+.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{visibility:hidden;pointer-events:none}.wrap-setting{display:flex;align-items:center;gap:6px}.wrap-setting input{width:auto;margin:0}
 .ang{border-left:5px solid #6610f2;padding-left:10px;margin-top:12px}.angle-grid,.tof-grid,.joystick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.angle-grid label,.tof-grid label,.joystick-grid label{margin-top:0}.angle-address,.tof-address,.joystick-address,.joystick-invert{grid-column:1/-1}.joystick-invert{display:flex;gap:18px;flex-wrap:wrap}.joystick-invert label{display:flex;align-items:center;gap:6px;margin:0}.joystick-invert input{width:auto;margin:0}
 .joy{border-left:5px solid #e83e8c;padding-left:10px;margin-top:12px}
 .device{border-left:5px solid #6f42c1}
@@ -1036,6 +1040,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       const String absoluteHiddenClass = devices[i].enc.sendIncrement ? " encoder-mode-hidden" : "";
       html += finiteFloatInputHtml(tr("Abs In Min", "絶対値入力の最小値"), "e0_" + idx, devices[i].enc.absInMin, "encoder-absolute-setting" + absoluteHiddenClass);
       html += finiteFloatInputHtml(tr("Abs In Max", "絶対値入力の最大値"), "e1_" + idx, devices[i].enc.absInMax, "encoder-absolute-setting" + absoluteHiddenClass);
+      html += "<label class='encoder-absolute-setting wrap-setting" + absoluteHiddenClass + "'><input type='checkbox' name='ew_" + idx + "'" + String(devices[i].enc.wrapAround ? " checked" : "") + "> " + String(tr("Wrap around", "範囲をループする")) + "</label>";
       html += finiteFloatInputHtml(tr("Inc Scale", "増分倍率"), "es_" + idx, devices[i].enc.incScale);
       html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "eo_" + idx, devices[i].enc.map.outMin);
       html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "eO_" + idx, devices[i].enc.map.outMax);
@@ -1225,6 +1230,7 @@ void handleSave() {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Rotation Address: ", "エンコーダー回転OSCアドレス: ")) + validationError); return;
       }
       if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
+      candidate.wrapAround = server.hasArg("ew_" + idx);
       if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
           !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
           !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
@@ -1246,6 +1252,7 @@ void handleSave() {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Click Sequence: ", "エンコーダークリックシーケンス: ")) + validationError); return;
       }
       devices[i].enc = candidate;
+      devices[i].boundedEncInited = false;
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       AngleOscConfig candidate = devices[i].angle;
       if (server.hasArg("aa_" + idx)) candidate.addr = server.arg("aa_" + idx);
