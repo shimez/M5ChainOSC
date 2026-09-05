@@ -28,10 +28,39 @@ struct RangeMap {
   ValueType outType = TYPE_FLOAT;
 };
 
+enum EncoderSettingsModel : uint8_t {
+  ENCODER_SETTINGS_LEGACY = 0,
+  ENCODER_SETTINGS_V2     = 1
+};
+
+enum EncoderRotationMode : uint8_t {
+  ENCODER_ROTATION_AMOUNT    = 0,
+  ENCODER_ROTATION_DIRECTION = 1
+};
+
 // ---------------------------------------------------------------------------
 // Per-device OSC config
 // ---------------------------------------------------------------------------
 struct EncoderOscConfig {
+  // Persistent Encoder model. D1/D2 settings that cannot be represented by
+  // Device Preset v2 remain LEGACY without correction or implicit migration.
+  EncoderSettingsModel settingsModel = ENCODER_SETTINGS_LEGACY;
+
+  // D3 / Device Preset v2 semantic settings. Runtime-only state such as the
+  // logical position and input baseline deliberately does not live here.
+  EncoderRotationMode rotationMode = ENCODER_ROTATION_AMOUNT;
+  uint16_t       rangeSteps = 20;
+  bool           clockwiseIncreases = true;
+  float          outputMin = 0;
+  float          outputMax = 1;
+  ValueType      outputType = TYPE_FLOAT;
+  String         clockwiseValue = "0.05";
+  String         counterClockwiseValue = "-0.05";
+  KeyMode        pushMode = MODE_PRESS_RELEASE;
+
+  // Phase 1 compatibility bridge for the released D1/D2 model and current
+  // runtime/Web UI. Phase 2 will stop using these fields for v2 semantics;
+  // they must remain available for the product-internal Legacy path.
   String         rotAddr       = "/avatar/parameters/Encoder";
   bool           sendIncrement = false;
   bool           wrapAround    = true;
@@ -112,6 +141,20 @@ struct ChainDevice {
   bool    encInited        = false;
   float   boundedEncAbs    = 0;
   bool    boundedEncInited = false;
+
+  // Device Preset v2 Encoder runtime state. These values are volatile and
+  // must never be serialized to LittleFS. UID continuity is added in Phase 3.
+  int32_t encV2LogicalPosition = 0;
+  bool encV2SemanticsObserved = false;
+  EncoderRotationMode encV2ObservedMode = ENCODER_ROTATION_AMOUNT;
+  bool encV2AmountSnapshotValid = false;
+  uint16_t encV2RangeSteps = 0;
+  bool encV2Wrap = false;
+  bool encV2ClockwiseIncreases = true;
+  float encV2OutputMin = 0;
+  float encV2OutputMax = 0;
+  ValueType encV2OutputType = TYPE_FLOAT;
+
   int     lastAngle        = -99999;
   int16_t lastJoyX         = 0;
   int16_t lastJoyY         = 0;

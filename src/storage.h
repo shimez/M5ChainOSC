@@ -14,6 +14,10 @@ void setDefaultDeviceMessages(ChainDevice& d);
 String serializeDeviceConfig(const ChainDevice& d);
 size_t deviceConfigStorageBytes(const ChainDevice& d);
 void applySerializedConfig(ChainDevice& d, const String& blob);
+// Builds a v2 candidate for a future explicit user-requested migration.
+// Loading or normally saving a Legacy D1/D2 setting never calls this helper.
+bool buildEncoderV2MigrationCandidate(const EncoderOscConfig& legacy,
+                                      EncoderOscConfig& candidate);
 
 // Per-device load / save / delete
 String loadDeviceNameOnly(const String& uid);

@@ -13,6 +13,12 @@ bool sendOSCValue(const String& address, ValueType type, float value, const Stri
   return true;
 }
 
+bool sendOSCInt32Value(const String& address, int32_t value) {
+  if (WiFi.status() != WL_CONNECTED || !address.length()) return false;
+  OscWiFi.send(osc_host.c_str(), osc_port, address.c_str(), value);
+  return true;
+}
+
 bool sendOSC(const OSCMessage& m) {
   if (m.valueType == TYPE_STRING)
     return sendOSCValue(m.address, TYPE_STRING, 0, m.valueStr);

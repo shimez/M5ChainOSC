@@ -56,7 +56,7 @@ static void updateIdentifyLeds() {
   }
 }
 
-void pollEncoder(ChainDevice& d) {
+static void pollLegacyEncoderRotation(ChainDevice& d) {
   int16_t absv = 0;
   if (M5Chain.getEncoderValue(d.chainId, &absv) == CHAIN_OK) {
     if (!d.encInited) {
@@ -94,10 +94,144 @@ void pollEncoder(ChainDevice& d) {
       sendMappedOsc(deviceDisplayName(d), d.enc.rotAddr, mapped, d.enc.map.outType);
     }
   }
+}
+
+static bool amountSnapshotMatches(const ChainDevice& d) {
+  return d.encV2AmountSnapshotValid &&
+         d.encV2RangeSteps == d.enc.rangeSteps &&
+         d.encV2Wrap == d.enc.wrapAround &&
+         d.encV2ClockwiseIncreases == d.enc.clockwiseIncreases &&
+         d.encV2OutputMin == d.enc.outputMin &&
+         d.encV2OutputMax == d.enc.outputMax &&
+         d.encV2OutputType == d.enc.outputType;
+}
+
+static void captureAmountSnapshot(ChainDevice& d) {
+  d.encV2AmountSnapshotValid = true;
+  d.encV2RangeSteps = d.enc.rangeSteps;
+  d.encV2Wrap = d.enc.wrapAround;
+  d.encV2ClockwiseIncreases = d.enc.clockwiseIncreases;
+  d.encV2OutputMin = d.enc.outputMin;
+  d.encV2OutputMax = d.enc.outputMax;
+  d.encV2OutputType = d.enc.outputType;
+}
+
+void resetEncoderV2Runtime(ChainDevice& d) {
+  d.encV2LogicalPosition = 0;
+  d.encV2SemanticsObserved = false;
+  d.encV2AmountSnapshotValid = false;
+}
+
+static void observeV2Semantics(ChainDevice& d) {
+  if (d.enc.rotationMode == ENCODER_ROTATION_AMOUNT) {
+    const bool enteringAmount = !d.encV2SemanticsObserved ||
+                                d.encV2ObservedMode != ENCODER_ROTATION_AMOUNT;
+    if (enteringAmount || !amountSnapshotMatches(d))
+      d.encV2LogicalPosition = 0;
+    captureAmountSnapshot(d);
+  }
+  d.encV2ObservedMode = d.enc.rotationMode;
+  d.encV2SemanticsObserved = true;
+}
+
+static String amountStringValue(float value) {
+  String result(value, 3);
+  return result == "-0.000" ? String("0.000") : result;
+}
+
+static bool sendV2AmountValue(const ChainDevice& d, float mapped) {
+  const String& address = d.enc.rotAddr;
+  const String name = deviceDisplayName(d);
+  if (d.enc.outputType == TYPE_INT) {
+    const int32_t value = (int32_t)lroundf(mapped);
+    if (!sendOSCInt32Value(address, value)) return false;
+    showOscFeedback(name, address, String(value));
+    return true;
+  }
+  if (d.enc.outputType == TYPE_STRING) {
+    const String value = amountStringValue(mapped);
+    if (!sendOSCValue(address, TYPE_STRING, 0, value)) return false;
+    showOscFeedback(name, address, value);
+    return true;
+  }
+  if (!sendOSCValue(address, TYPE_FLOAT, mapped)) return false;
+  showOscFeedback(name, address, String(mapped, 3));
+  return true;
+}
+
+static bool sendV2DirectionValue(const ChainDevice& d, int16_t delta) {
+  if (delta == 0) return false;
+  const String& address = d.enc.rotAddr;
+  const String& value = delta > 0 ? d.enc.clockwiseValue
+                                  : d.enc.counterClockwiseValue;
+  bool sent = false;
+  if (d.enc.outputType == TYPE_INT) {
+    sent = sendOSCInt32Value(address, (int32_t)strtol(value.c_str(), nullptr, 10));
+  } else if (d.enc.outputType == TYPE_FLOAT) {
+    sent = sendOSCValue(address, TYPE_FLOAT, value.toFloat());
+  } else {
+    sent = sendOSCValue(address, TYPE_STRING, 0, value);
+  }
+  if (sent) showOscFeedback(deviceDisplayName(d), address, value);
+  return sent;
+}
+
+static void applyV2EncoderDelta(ChainDevice& d, int16_t delta) {
+  if (d.enc.rotationMode < ENCODER_ROTATION_AMOUNT ||
+      d.enc.rotationMode > ENCODER_ROTATION_DIRECTION) return;
+  if (d.enc.rotationMode == ENCODER_ROTATION_AMOUNT &&
+      (d.enc.rangeSteps < 1 || !isfinite(d.enc.outputMin) ||
+       !isfinite(d.enc.outputMax) || !(d.enc.outputMin < d.enc.outputMax)))
+    return;
+  observeV2Semantics(d);
+  if (delta == 0) return;
+
+  if (d.enc.rotationMode == ENCODER_ROTATION_DIRECTION) {
+    sendV2DirectionValue(d, delta);
+    return;
+  }
+
+  // D3 validation guarantees rangeSteps >= 1 and finite ordered outputs.
+  const int32_t rangeSteps = d.enc.rangeSteps;
+  const int32_t amountDelta = d.enc.clockwiseIncreases
+                                  ? (int32_t)delta
+                                  : -(int32_t)delta;
+  int64_t next = (int64_t)d.encV2LogicalPosition + amountDelta;
+  if (d.enc.wrapAround) {
+    const int64_t positionCount = (int64_t)rangeSteps + 1;
+    next %= positionCount;
+    if (next < 0) next += positionCount;
+  } else {
+    if (next < 0) next = 0;
+    if (next > rangeSteps) next = rangeSteps;
+  }
+  d.encV2LogicalPosition = (int32_t)next;
+
+  const float ratio = (float)d.encV2LogicalPosition / (float)rangeSteps;
+  const float mapped = d.enc.outputMin +
+                       ratio * (d.enc.outputMax - d.enc.outputMin);
+  // A nonzero input always sends, including an outward step at a Stop endpoint.
+  sendV2AmountValue(d, mapped);
+}
+
+static void pollV2EncoderRotation(ChainDevice& d) {
+  int16_t delta = 0;
+  if (M5Chain.getEncoderIncValue(d.chainId, &delta) != CHAIN_OK) return;
+  applyV2EncoderDelta(d, delta);
+}
+
+void pollEncoder(ChainDevice& d) {
+  if (d.enc.settingsModel == ENCODER_SETTINGS_V2)
+    pollV2EncoderRotation(d);
+  else
+    pollLegacyEncoderRotation(d);
 
   uint8_t st = 0;
   if (M5Chain.getEncoderButtonStatus(d.chainId, &st) == CHAIN_OK && st != d.lastButtonStatus) {
-    if (d.enc.clickMode == MODE_SEQUENCE) {
+    const KeyMode pushMode = d.enc.settingsModel == ENCODER_SETTINGS_V2
+                                 ? d.enc.pushMode
+                                 : d.enc.clickMode;
+    if (pushMode == MODE_SEQUENCE) {
       if (st == 1) {
         setOperationalLed(d, color_green);
         handleSequencePress(d.enc.clickSeq, deviceDisplayName(d));
