@@ -110,6 +110,23 @@ struct TofOscConfig {
   RangeMap map;                   // in: 30–maxDistanceMm → out: configurable
 };
 
+// Volatile Device Preset v2 Encoder state. The authoritative instance lives
+// in the UID cache; ChainDevice owns one only as a safe non-persistent fallback
+// when a verified 12-byte UID is unavailable or the bounded cache is full.
+struct EncoderV2RuntimeState {
+  int32_t logicalPosition = 0;
+  bool semanticsObserved = false;
+  EncoderRotationMode observedMode = ENCODER_ROTATION_AMOUNT;
+  bool amountSnapshotValid = false;
+  uint16_t rangeSteps = 0;
+  bool wrap = false;
+  bool clockwiseIncreases = true;
+  float outputMin = 0;
+  float outputMax = 0;
+  ValueType outputType = TYPE_FLOAT;
+  bool inputContinuityValid = false;
+};
+
 // ---------------------------------------------------------------------------
 // Live Chain device slot
 // ---------------------------------------------------------------------------
@@ -142,18 +159,7 @@ struct ChainDevice {
   float   boundedEncAbs    = 0;
   bool    boundedEncInited = false;
 
-  // Device Preset v2 Encoder runtime state. These values are volatile and
-  // must never be serialized to LittleFS. UID continuity is added in Phase 3.
-  int32_t encV2LogicalPosition = 0;
-  bool encV2SemanticsObserved = false;
-  EncoderRotationMode encV2ObservedMode = ENCODER_ROTATION_AMOUNT;
-  bool encV2AmountSnapshotValid = false;
-  uint16_t encV2RangeSteps = 0;
-  bool encV2Wrap = false;
-  bool encV2ClockwiseIncreases = true;
-  float encV2OutputMin = 0;
-  float encV2OutputMax = 0;
-  ValueType encV2OutputType = TYPE_FLOAT;
+  EncoderV2RuntimeState encV2FallbackRuntime;
 
   int     lastAngle        = -99999;
   int16_t lastJoyX         = 0;
