@@ -7,12 +7,15 @@
 #include "system_settings.h"
 #include <ctype.h>
 #include <errno.h>
+#include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <new>
 #include <stdlib.h>
 #include <ArduinoJson.h>
 #include <esp_heap_caps.h>
+
+#define TEST_FORCE_ENCODER_SAVE_FAILURE 0
 
 static const char M5CHAINOSC_FAVICON_LINK[] PROGMEM =
     "<link rel='icon' type='image/svg+xml' href='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIHN0b3AtY29sb3I9IiMyOTIyNGYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwOTBkMTgiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0idXJsKCNiZykiLz4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9IiM5Njc0ZmYiIHN0cm9rZS13aWR0aD0iNS41Ij48cmVjdCB4PSI5IiB5PSIyMiIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiByeD0iOC41IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTggMjIuNSAzMC41KSIvPjxyZWN0IHg9IjI4IiB5PSIyMiIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiByeD0iOC41IiB0cmFuc2Zvcm09InJvdGF0ZSgxOCA0MS41IDMwLjUpIi8+PC9nPgo8L3N2Zz4K'>";
@@ -104,6 +107,40 @@ static bool hasRequiredPresetFields(JsonObjectConst object,
   return true;
 }
 
+static bool hasOnlyPresetFields(JsonObjectConst object,
+                                const char* const* fields,
+                                size_t fieldCount, String& error) {
+  for (JsonPairConst pair : object) {
+    bool allowed = false;
+    for (size_t i = 0; i < fieldCount; ++i) {
+      if (strcmp(pair.key().c_str(), fields[i]) == 0) {
+        allowed = true;
+        break;
+      }
+    }
+    if (!allowed) return presetDeviceSettingInvalid(error);
+  }
+  return true;
+}
+
+static bool jsonFiniteFloat32(JsonVariantConst value, float& result,
+                              String& error) {
+  if (!value.is<float>()) return presetFieldTypeInvalid(error);
+  const double raw = value.as<double>();
+  if (!isfinite(raw) || raw > FLT_MAX || raw < -FLT_MAX)
+    return presetDeviceSettingInvalid(error);
+  result = static_cast<float>(raw);
+  if (!isfinite(result) || (raw != 0.0 && result == 0.0f))
+    return presetDeviceSettingInvalid(error);
+  return true;
+}
+
+static String float32Text(float value) {
+  char text[24];
+  snprintf(text, sizeof(text), "%.9g", (double)value);
+  return String(text);
+}
+
 static void sendUiResult(int status, const String& title, const String& message,
                          bool showBack = true) {
   if (server.hasArg("ajax")) {
@@ -160,6 +197,21 @@ static String clickModeHtml(const String& name, KeyMode cur, const String& prId,
   return s;
 }
 
+static String pushModeHtml(const String& name, KeyMode cur, const String& prId,
+                           const String& sqId) {
+  String s = "<div class='mode-box'><label>" +
+             String(tr("Push Mode", "プッシュモード")) + "</label>";
+  s += "<select name='" + name + "' onchange=\"toggleClickMode('" + prId +
+       "','" + sqId + "',this)\">";
+  s += "<option value='0'" +
+       String(cur == MODE_PRESS_RELEASE ? " selected" : "") + ">" +
+       String(tr("Press / Release", "押した時／離した時")) + "</option>";
+  s += "<option value='1'" +
+       String(cur == MODE_SEQUENCE ? " selected" : "") + ">" +
+       String(tr("Sequence", "シーケンス")) + "</option></select></div>";
+  return s;
+}
+
 static String messageRowHtml(const String& group, const String& prefix, const char* eventName, int order, const OSCMessage& m) {
   String idx = group.substring(prefix.length());
   String p = prefix + (String(eventName) == "press" ? "p" : "r");
@@ -193,6 +245,17 @@ static String finiteFloatInputHtml(const String& label, const String& name,
          "</label><input class='finite-float' type='number' step='any' name='" +
          name + "' value='" + String(value) +
          "' oninput='validateNumericInput(this)'><small class='numeric-error err'></small></div>";
+}
+
+static String finiteFloat32InputHtml(const String& label, const String& name,
+                                     float value,
+                                     const String& extraClass = "") {
+  String classes = "numeric-field";
+  if (extraClass.length()) classes += " " + extraClass;
+  return "<div class='" + classes + "'><label>" + label +
+         "</label><input class='finite-float' type='number' step='any' name='" +
+         name + "' value='" + String(value, 9) +
+         "' oninput='validateNumericInput(this);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
 }
 
 static String boundedIntegerInputHtml(const String& label, const String& name,
@@ -377,6 +440,65 @@ static String sequenceJson(const SequenceConfig& sequence) {
          ",\"step\":" + String(sequence.step, 6) + "}";
 }
 
+static String sequenceV2Json(const SequenceConfig& sequence) {
+  return String("{\"address\":") + jsonString(sequence.address) +
+         ",\"type\":" + String((int)sequence.valueType) +
+         ",\"start\":" + float32Text(sequence.start) +
+         ",\"end\":" + float32Text(sequence.end) +
+         ",\"step\":" + float32Text(sequence.step) + "}";
+}
+
+static bool encoderV2ExportIsValid(const ChainDevice& device, String& error) {
+  if (device.type != CHAIN_ENCODER_TYPE_CODE ||
+      device.enc.settingsModel != ENCODER_SETTINGS_V2 ||
+      !encoderV2SettingsAreValid(device.enc))
+    return presetDeviceSettingInvalid(error);
+  String rotationAddress = device.enc.rotAddr;
+  if (!validOscAddressText(rotationAddress, error)) return false;
+  if (device.enc.pressMessageCount + device.enc.releaseMessageCount >
+      MAX_KEY_OSC_MESSAGES) {
+    error = tr("E_OSC_MESSAGE_COUNT_EXCEEDED: Press and Release OSC messages must total 8 or fewer.",
+               "E_OSC_MESSAGE_COUNT_EXCEEDED: PressとReleaseのOSCメッセージは、合計8件以内にしてください。");
+    return false;
+  }
+  for (uint8_t i = 0; i < device.enc.pressMessageCount; ++i) {
+    OSCMessage message = device.enc.pressMessages[i];
+    if (!validOscAddressText(message.address, error)) return false;
+    if (!validOscMessage(message, error)) return false;
+  }
+  for (uint8_t i = 0; i < device.enc.releaseMessageCount; ++i) {
+    OSCMessage message = device.enc.releaseMessages[i];
+    if (!validOscAddressText(message.address, error)) return false;
+    if (!validOscMessage(message, error)) return false;
+  }
+  String sequenceAddress = device.enc.clickSeq.address;
+  if (!validOscAddressText(sequenceAddress, error)) return false;
+  if (device.enc.clickSeq.valueType < TYPE_FLOAT ||
+      device.enc.clickSeq.valueType > TYPE_STRING)
+    return oscTypeInvalid(error);
+  if (!isfinite(device.enc.clickSeq.start) ||
+      !isfinite(device.enc.clickSeq.end) ||
+      !isfinite(device.enc.clickSeq.step)) {
+    error = tr("E_SEQUENCE_VALUE_INVALID: A Sequence number is invalid. Specify finite float32 numbers for Start, End, and Step.",
+               "E_SEQUENCE_VALUE_INVALID: Sequenceの数値が正しくありません。Start、End、Stepには有限のfloat32値を指定してください。");
+    return false;
+  }
+  if (device.enc.clickSeq.step == 0.0f) {
+    error = tr("E_SEQUENCE_STEP_ZERO: Sequence Step must not be zero. Specify a non-zero value that moves from Start toward End.",
+               "E_SEQUENCE_STEP_ZERO: SequenceのStepには0を指定できません。StartからEndへ進む0以外の値を指定してください。");
+    return false;
+  }
+  if ((device.enc.clickSeq.start < device.enc.clickSeq.end &&
+       device.enc.clickSeq.step < 0.0f) ||
+      (device.enc.clickSeq.start > device.enc.clickSeq.end &&
+       device.enc.clickSeq.step > 0.0f)) {
+    error = tr("E_SEQUENCE_DIRECTION_INVALID: Sequence direction is invalid. Use a Step that moves from Start toward End.",
+               "E_SEQUENCE_DIRECTION_INVALID: Sequenceの進行方向が正しくありません。StartからEndへ進むStepを指定してください。");
+    return false;
+  }
+  return true;
+}
+
 static String rangeJson(const RangeMap& map) {
   return String("{\"outMin\":") + String(map.outMin, 6) +
          ",\"outMax\":" + String(map.outMax, 6) +
@@ -389,7 +511,23 @@ static String numericRangeJson(const RangeMap& map) {
   return rangeJson(numericMap);
 }
 
+static String encoderV2DirectionValueJson(const String& value,
+                                          ValueType outputType) {
+  if (outputType == TYPE_STRING) return jsonString(value);
+  if (outputType == TYPE_INT) {
+    char* end = nullptr;
+    const long parsed = strtol(value.c_str(), &end, 10);
+    return String((int32_t)parsed);
+  }
+  char* end = nullptr;
+  const float parsed = strtof(value.c_str(), &end);
+  return float32Text(parsed);
+}
+
 static String deviceJson(const ChainDevice& device, bool includeIdentity = true) {
+  const bool encoderV2Preset = !includeIdentity &&
+      device.type == CHAIN_ENCODER_TYPE_CODE &&
+      device.enc.settingsModel == ENCODER_SETTINGS_V2;
   String out = "{";
   if (includeIdentity) {
     out += String("\"uid\":") + jsonString(device.uid) +
@@ -398,7 +536,9 @@ static String deviceJson(const ChainDevice& device, bool includeIdentity = true)
            ",\"displayName\":" + jsonString(device.displayName);
   } else {
     out += String("\"format\":") + jsonString(String(DEVICE_PRESET_FORMAT_NAME)) +
-           ",\"schemaVersion\":" + String(DEVICE_PRESET_SCHEMA_VERSION) +
+           ",\"schemaVersion\":" +
+               String(encoderV2Preset ? DEVICE_PRESET_SCHEMA_VERSION_V2
+                                      : DEVICE_PRESET_SCHEMA_VERSION) +
            ",\"deviceType\":" + String((int)device.type) +
            ",\"deviceTypeName\":" + jsonString(String(typeToName(device.type)));
   }
@@ -415,17 +555,49 @@ static String deviceJson(const ChainDevice& device, bool includeIdentity = true)
     }
     out += "],\"sequence\":" + sequenceJson(device.seq) + "}";
   } else if (device.type == CHAIN_ENCODER_TYPE_CODE) {
-    out += ",\"encoder\":{\"rotationAddress\":" + jsonString(device.enc.rotAddr) +
-           ",\"sendIncrement\":" + String(device.enc.sendIncrement ? "true" : "false") +
-           ",\"wrapAround\":" + String(device.enc.wrapAround ? "true" : "false") +
-           ",\"absoluteInputMin\":" + String(device.enc.absInMin, 6) +
-           ",\"absoluteInputMax\":" + String(device.enc.absInMax, 6) +
-           ",\"incrementScale\":" + String(device.enc.incScale, 6) +
-           ",\"range\":" + rangeJson(device.enc.map) +
-           ",\"clickMode\":" + String((int)device.enc.clickMode) +
-           ",\"press\":" + messageArrayJson(device.enc.pressMessages,device.enc.pressMessageCount) +
-           ",\"release\":" + messageArrayJson(device.enc.releaseMessages,device.enc.releaseMessageCount) +
-           ",\"sequence\":" + sequenceJson(device.enc.clickSeq) + "}";
+    if (encoderV2Preset) {
+      out += ",\"encoder\":{\"rotationAddress\":" + jsonString(device.enc.rotAddr) +
+             ",\"rotationMode\":" +
+                 jsonString(device.enc.rotationMode == ENCODER_ROTATION_AMOUNT
+                                ? "amount" : "direction");
+      if (device.enc.rotationMode == ENCODER_ROTATION_AMOUNT) {
+        out += ",\"rangeSteps\":" + String(device.enc.rangeSteps) +
+               ",\"wrap\":" + String(device.enc.wrapAround ? "true" : "false") +
+               ",\"clockwiseIncreases\":" +
+                   String(device.enc.clockwiseIncreases ? "true" : "false") +
+               ",\"outputMin\":" + float32Text(device.enc.outputMin) +
+               ",\"outputMax\":" + float32Text(device.enc.outputMax);
+      } else {
+        out += ",\"clockwiseValue\":" +
+                   encoderV2DirectionValueJson(device.enc.clockwiseValue,
+                                               device.enc.outputType) +
+               ",\"counterClockwiseValue\":" +
+                   encoderV2DirectionValueJson(
+                       device.enc.counterClockwiseValue,
+                       device.enc.outputType);
+      }
+      out += ",\"outputType\":" + String((int)device.enc.outputType) +
+             ",\"pushMode\":" + String((int)device.enc.pushMode) +
+             ",\"press\":" +
+                 messageArrayJson(device.enc.pressMessages,
+                                  device.enc.pressMessageCount) +
+             ",\"release\":" +
+                 messageArrayJson(device.enc.releaseMessages,
+                                  device.enc.releaseMessageCount) +
+             ",\"sequence\":" + sequenceV2Json(device.enc.clickSeq) + "}";
+    } else {
+      out += ",\"encoder\":{\"rotationAddress\":" + jsonString(device.enc.rotAddr) +
+             ",\"sendIncrement\":" + String(device.enc.sendIncrement ? "true" : "false") +
+             ",\"wrapAround\":" + String(device.enc.wrapAround ? "true" : "false") +
+             ",\"absoluteInputMin\":" + String(device.enc.absInMin, 6) +
+             ",\"absoluteInputMax\":" + String(device.enc.absInMax, 6) +
+             ",\"incrementScale\":" + String(device.enc.incScale, 6) +
+             ",\"range\":" + rangeJson(device.enc.map) +
+             ",\"clickMode\":" + String((int)device.enc.clickMode) +
+             ",\"press\":" + messageArrayJson(device.enc.pressMessages,device.enc.pressMessageCount) +
+             ",\"release\":" + messageArrayJson(device.enc.releaseMessages,device.enc.releaseMessageCount) +
+             ",\"sequence\":" + sequenceJson(device.enc.clickSeq) + "}";
+    }
   } else if (device.type == CHAIN_ANGLE_TYPE_CODE) {
     out += ",\"angle\":{\"address\":" + jsonString(device.angle.addr) +
            ",\"use12bit\":" + String(device.angle.use12bit ? "true" : "false") +
@@ -457,6 +629,7 @@ static bool jsonMessage(JsonObjectConst object, OSCMessage& message, String& err
   if (object.isNull()) return presetFieldTypeInvalid(error);
   static const char* const required[] = {"address", "value", "type"};
   if (!hasRequiredPresetFields(object, required, 3, error)) return false;
+  if (!hasOnlyPresetFields(object, required, 3, error)) return false;
   if (!object["address"].is<const char*>() ||
       !object["value"].is<const char*>() || !object["type"].is<int>()) {
     return presetFieldTypeInvalid(error);
@@ -471,7 +644,8 @@ static bool jsonMessage(JsonObjectConst object, OSCMessage& message, String& err
 static bool jsonMessageArrays(JsonVariantConst pv,JsonVariantConst rv,OSCMessage* press,uint8_t& pc,OSCMessage* release,uint8_t& rc,String& error){if(!pv.is<JsonArrayConst>()||!rv.is<JsonArrayConst>())return presetFieldTypeInvalid(error);JsonArrayConst p=pv.as<JsonArrayConst>(),r=rv.as<JsonArrayConst>();if(p.size()+r.size()>MAX_KEY_OSC_MESSAGES){error=tr("E_OSC_MESSAGE_COUNT_EXCEEDED: Press and Release OSC messages must total 8 or fewer.","E_OSC_MESSAGE_COUNT_EXCEEDED: PressとReleaseのOSCメッセージは、合計8件以内にしてください。");return false;}pc=p.size();rc=r.size();uint8_t i=0;for(JsonVariantConst item:p){if(!item.is<JsonObjectConst>())return presetFieldTypeInvalid(error);if(!jsonMessage(item.as<JsonObjectConst>(),press[i++],error))return false;}i=0;for(JsonVariantConst item:r){if(!item.is<JsonObjectConst>())return presetFieldTypeInvalid(error);if(!jsonMessage(item.as<JsonObjectConst>(),release[i++],error))return false;}return true;}
 
 static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence,
-                         String& error, bool allowLegacyType) {
+                         String& error, bool allowLegacyType,
+                         bool requireFloat32 = false) {
   if (object.isNull()) return presetFieldTypeInvalid(error);
   if (!object.containsKey("address") || !object.containsKey("type") ||
       !object.containsKey("start") || !object.containsKey("end") ||
@@ -482,6 +656,8 @@ static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence,
   }
   if (!object["address"].is<const char*>() || !object["type"].is<int>())
     return presetFieldTypeInvalid(error);
+  static const char* const fields[] = {"address", "type", "start", "end", "step"};
+  if (!hasOnlyPresetFields(object, fields, 5, error)) return false;
   if (!object["start"].is<float>() || !object["end"].is<float>() ||
       !object["step"].is<float>()) {
     error = tr("E_SEQUENCE_VALUE_INVALID: A Sequence number is invalid. Specify finite numbers for Start, End, and Step.",
@@ -500,9 +676,19 @@ static bool jsonSequence(JsonObjectConst object, SequenceConfig& sequence,
     type = TYPE_FLOAT;
   }
   sequence.valueType = (ValueType)type;
-  sequence.start = object["start"].as<float>();
-  sequence.end = object["end"].as<float>();
-  sequence.step = object["step"].as<float>();
+  if (requireFloat32) {
+    if (!jsonFiniteFloat32(object["start"], sequence.start, error) ||
+        !jsonFiniteFloat32(object["end"], sequence.end, error) ||
+        !jsonFiniteFloat32(object["step"], sequence.step, error)) {
+      error = tr("E_SEQUENCE_VALUE_INVALID: A Sequence number is invalid. Specify finite float32 numbers for Start, End, and Step.",
+                 "E_SEQUENCE_VALUE_INVALID: Sequenceの数値が正しくありません。Start、End、Stepには有限のfloat32値を指定してください。");
+      return false;
+    }
+  } else {
+    sequence.start = object["start"].as<float>();
+    sequence.end = object["end"].as<float>();
+    sequence.step = object["step"].as<float>();
+  }
   if (!isfinite(sequence.start) || !isfinite(sequence.end) || !isfinite(sequence.step)) {
     error = tr("E_SEQUENCE_VALUE_INVALID: A Sequence number is invalid. Specify finite numbers for Start, End, and Step.",
                "E_SEQUENCE_VALUE_INVALID: Sequenceの数値が正しくありません。Start、End、Stepには有限の数値を指定してください。");
@@ -529,18 +715,16 @@ static bool jsonRange(JsonObjectConst object, RangeMap& range, String& error,
   if (object.isNull()) return presetFieldTypeInvalid(error);
   static const char* const required[] = {"outMin", "outMax", "type"};
   if (!hasRequiredPresetFields(object, required, 3, error)) return false;
+  if (!hasOnlyPresetFields(object, required, 3, error)) return false;
   if (!object["outMin"].is<float>() || !object["outMax"].is<float>() ||
       !object["type"].is<int>()) return presetFieldTypeInvalid(error);
-  range.outMin = object["outMin"].as<float>();
-  range.outMax = object["outMax"].as<float>();
+  if (!jsonFiniteFloat32(object["outMin"], range.outMin, error) ||
+      !jsonFiniteFloat32(object["outMax"], range.outMax, error)) return false;
   int type = object["type"].as<int>();
   if (type < TYPE_FLOAT || type > TYPE_STRING)
     return oscTypeInvalid(error);
   if (numericOnly && type == TYPE_STRING && !allowLegacyString)
     return oscTypeInvalid(error);
-  if (!isfinite(range.outMin) || !isfinite(range.outMax)) {
-    return presetDeviceSettingInvalid(error);
-  }
   range.outType = (ValueType)type;
   return true;
 }
@@ -619,6 +803,13 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
         "absoluteInputMax", "incrementScale", "range", "clickMode",
         "press", "release", "sequence"};
     if (!hasRequiredPresetFields(v, required, 10, error)) return false;
+    if (!allowLegacyTypes) {
+      static const char* const allowed[] = {
+          "rotationAddress", "sendIncrement", "wrapAround",
+          "absoluteInputMin", "absoluteInputMax", "incrementScale", "range",
+          "clickMode", "press", "release", "sequence"};
+      if (!hasOnlyPresetFields(v, allowed, 11, error)) return false;
+    }
     if (!v["rotationAddress"].is<const char*>() ||
         !v["sendIncrement"].is<bool>() ||
         (v.containsKey("wrapAround") && !v["wrapAround"].is<bool>()) ||
@@ -633,11 +824,10 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
     device.enc.sendIncrement = v["sendIncrement"] | false;
     device.enc.wrapAround = v["wrapAround"] | true;
     device.boundedEncInited = false;
-    device.enc.absInMin = v["absoluteInputMin"].as<float>(); device.enc.absInMax = v["absoluteInputMax"].as<float>();
-    device.enc.incScale = v["incrementScale"].as<float>();
-    if (!isfinite(device.enc.absInMin) || !isfinite(device.enc.absInMax) ||
-        !isfinite(device.enc.incScale))
-      return presetDeviceSettingInvalid(error);
+    if (!jsonFiniteFloat32(v["absoluteInputMin"], device.enc.absInMin, error) ||
+        !jsonFiniteFloat32(v["absoluteInputMax"], device.enc.absInMax, error) ||
+        !jsonFiniteFloat32(v["incrementScale"], device.enc.incScale, error))
+      return false;
     if (!jsonRange(v["range"].as<JsonObjectConst>(), device.enc.map, error)) return false;
     int mode = v["clickMode"].as<int>();
     if (mode < MODE_PRESS_RELEASE || mode > MODE_SEQUENCE)
@@ -716,6 +906,138 @@ static bool deviceFromJson(JsonObjectConst object, ChainDevice& device,
     device.tof.map.inMax = device.tof.maxDistanceMm;
   } else { error = "Unsupported device type."; return false; }
   if (deviceConfigStorageBytes(device) > MAX_DEVICE_CONFIG_BYTES) { error = "Device configuration is too large."; return false; }
+  return true;
+}
+
+static bool deviceFromPresetV2Encoder(JsonObjectConst object,
+                                      ChainDevice& device, String& error) {
+  if (object.isNull()) return presetFieldTypeInvalid(error);
+  static const char* const rootFields[] = {
+      "format", "schemaVersion", "deviceType", "deviceTypeName", "encoder",
+      "uid", "displayName"};
+  if (!hasOnlyPresetFields(object, rootFields, 7, error)) return false;
+  if (!object.containsKey("uid") || !object.containsKey("encoder"))
+    return presetRequiredFieldMissing(error);
+  if (!object["uid"].is<const char*>() ||
+      !object["encoder"].is<JsonObjectConst>())
+    return presetFieldTypeInvalid(error);
+
+  device = ChainDevice();
+  device.uid = object["uid"].as<const char*>();
+  device.uid.trim();
+  if (!device.uid.length() || isPlaceholderUid(device.uid))
+    return presetDeviceSettingInvalid(error);
+  device.uidShort = device.uid.substring(max(0, (int)device.uid.length() - 8));
+  device.type = (chain_device_type_t)CHAIN_ENCODER_TYPE_CODE;
+  setDefaultDeviceMessages(device);
+  if (object["displayName"].is<const char*>())
+    device.displayName = object["displayName"].as<const char*>();
+  if (device.displayName.length() > MAX_DEVICE_NAME_BYTES)
+    return presetDeviceSettingInvalid(error);
+
+  JsonObjectConst encoder = object["encoder"].as<JsonObjectConst>();
+  static const char* const common[] = {
+      "rotationAddress", "rotationMode", "outputType", "pushMode",
+      "press", "release", "sequence"};
+  if (!hasRequiredPresetFields(encoder, common, 7, error)) return false;
+  if (!encoder["rotationAddress"].is<const char*>() ||
+      !encoder["rotationMode"].is<const char*>() ||
+      !encoder["outputType"].is<int>() || !encoder["pushMode"].is<int>() ||
+      !encoder["press"].is<JsonArrayConst>() ||
+      !encoder["release"].is<JsonArrayConst>() ||
+      !encoder["sequence"].is<JsonObjectConst>())
+    return presetFieldTypeInvalid(error);
+
+  if (!jsonAddress(encoder["rotationAddress"], device.enc.rotAddr, error))
+    return false;
+  const int outputType = encoder["outputType"].as<int>();
+  if (outputType < TYPE_FLOAT || outputType > TYPE_STRING)
+    return oscTypeInvalid(error);
+  const int pushMode = encoder["pushMode"].as<int>();
+  if (pushMode < MODE_PRESS_RELEASE || pushMode > MODE_SEQUENCE)
+    return presetDeviceSettingInvalid(error);
+  device.enc.outputType = (ValueType)outputType;
+  device.enc.pushMode = (KeyMode)pushMode;
+
+  if (!jsonMessageArrays(encoder["press"], encoder["release"],
+                         device.enc.pressMessages,
+                         device.enc.pressMessageCount,
+                         device.enc.releaseMessages,
+                         device.enc.releaseMessageCount, error) ||
+      !jsonSequence(encoder["sequence"].as<JsonObjectConst>(),
+                    device.enc.clickSeq, error, false, true)) return false;
+  if (device.enc.pressMessageCount)
+    device.enc.press = device.enc.pressMessages[0];
+  if (device.enc.releaseMessageCount)
+    device.enc.release = device.enc.releaseMessages[0];
+
+  const String rotationMode = encoder["rotationMode"].as<const char*>();
+  if (rotationMode == "amount") {
+    static const char* const amountFields[] = {
+        "rotationAddress", "rotationMode", "rangeSteps", "wrap",
+        "clockwiseIncreases", "outputMin", "outputMax", "outputType",
+        "pushMode", "press", "release", "sequence"};
+    if (!hasRequiredPresetFields(encoder, amountFields, 12, error)) return false;
+    if (!hasOnlyPresetFields(encoder, amountFields, 12, error)) return false;
+    if (!encoder["rangeSteps"].is<int>() || !encoder["wrap"].is<bool>() ||
+        !encoder["clockwiseIncreases"].is<bool>())
+      return presetFieldTypeInvalid(error);
+    const int rangeSteps = encoder["rangeSteps"].as<int>();
+    if (rangeSteps < 1 || rangeSteps > 65535)
+      return presetDeviceSettingInvalid(error);
+    device.enc.rotationMode = ENCODER_ROTATION_AMOUNT;
+    device.enc.rangeSteps = (uint16_t)rangeSteps;
+    device.enc.wrapAround = encoder["wrap"].as<bool>();
+    device.enc.clockwiseIncreases = encoder["clockwiseIncreases"].as<bool>();
+    if (!jsonFiniteFloat32(encoder["outputMin"], device.enc.outputMin, error) ||
+        !jsonFiniteFloat32(encoder["outputMax"], device.enc.outputMax, error))
+      return false;
+  } else if (rotationMode == "direction") {
+    static const char* const directionFields[] = {
+        "rotationAddress", "rotationMode", "clockwiseValue",
+        "counterClockwiseValue", "outputType", "pushMode", "press",
+        "release", "sequence"};
+    if (!hasRequiredPresetFields(encoder, directionFields, 9, error)) return false;
+    if (!hasOnlyPresetFields(encoder, directionFields, 9, error)) return false;
+    device.enc.rotationMode = ENCODER_ROTATION_DIRECTION;
+    if (device.enc.outputType == TYPE_STRING) {
+      if (!encoder["clockwiseValue"].is<const char*>() ||
+          !encoder["counterClockwiseValue"].is<const char*>())
+        return presetFieldTypeInvalid(error);
+      device.enc.clockwiseValue = encoder["clockwiseValue"].as<const char*>();
+      device.enc.counterClockwiseValue =
+          encoder["counterClockwiseValue"].as<const char*>();
+    } else if (device.enc.outputType == TYPE_INT) {
+      if (!encoder["clockwiseValue"].is<int32_t>() ||
+          !encoder["counterClockwiseValue"].is<int32_t>())
+        return presetFieldTypeInvalid(error);
+      device.enc.clockwiseValue = String(encoder["clockwiseValue"].as<int32_t>());
+      device.enc.counterClockwiseValue =
+          String(encoder["counterClockwiseValue"].as<int32_t>());
+    } else {
+      float clockwise = 0.0f, counterClockwise = 0.0f;
+      if (!jsonFiniteFloat32(encoder["clockwiseValue"], clockwise, error) ||
+          !jsonFiniteFloat32(encoder["counterClockwiseValue"],
+                             counterClockwise, error)) return false;
+      device.enc.clockwiseValue = float32Text(clockwise);
+      device.enc.counterClockwiseValue = float32Text(counterClockwise);
+    }
+  } else {
+    return presetDeviceSettingInvalid(error);
+  }
+
+  device.enc.settingsModel = ENCODER_SETTINGS_V2;
+  device.enc.clickMode = device.enc.pushMode;
+  device.enc.map.outMin = device.enc.outputMin;
+  device.enc.map.outMax = device.enc.outputMax;
+  device.enc.map.outType = device.enc.outputType;
+  if (!encoderV2SettingsAreValid(device.enc))
+    return presetDeviceSettingInvalid(error);
+  if (deviceConfigStorageBytes(device) > MAX_DEVICE_CONFIG_BYTES) {
+    error = tr("E_PRESET_DEVICE_SETTING_INVALID: The device setting is too large.",
+               "E_PRESET_DEVICE_SETTING_INVALID: デバイス設定の容量が大きすぎます。");
+    return false;
+  }
   return true;
 }
 
@@ -849,7 +1171,7 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .release{border-left:5px solid #007bff;padding-left:10px;margin-top:12px}
 .seq{border-left:5px solid #20c997;padding-left:10px;margin-top:12px}
 .click-sequence{padding:10px;margin-top:12px}
-.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{visibility:hidden;pointer-events:none}.wrap-setting{display:flex;align-items:center;gap:6px}.wrap-setting input{width:auto;margin:0}
+.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{display:none}.wrap-setting{display:flex;align-items:center;gap:6px}.wrap-setting input{width:auto;margin:0}.encoder-model{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;background:#fff3cd;color:#795700;font-size:.75em;font-weight:normal}.encoder-model-v2{background:#dff3e5;color:#216e39}.encoder-migration-action{display:inline-block;width:auto;margin:0 0 0 8px;padding:5px 9px;border:1px solid #b58105;border-radius:5px;background:#fff;color:#795700;font-size:.8em}.encoder-migration-panel{margin:10px 0;padding:10px;border:1px solid #d7dee9;border-radius:6px;background:#f8fafc}.encoder-migration-panel .note{margin:0 0 8px}.encoder-migration-panel .warning{color:#8a4b00}.encoder-migration-cancel{display:inline-block;padding:6px 10px;border:1px solid #6c757d;border-radius:5px;color:#495057;text-decoration:none}.encoder-v2-mode{grid-column:1/-1}.encoder-v2-mode-fields{display:contents}.encoder-v2-direction-value input{font-family:inherit}.encoder-v2-amount-active .encoder-v2-type{order:1}.encoder-v2-amount-active .encoder-v2-increase-direction{order:2}
 .ang{border-left:5px solid #6610f2;padding-left:10px;margin-top:12px}.angle-grid,.tof-grid,.joystick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.angle-grid label,.tof-grid label,.joystick-grid label{margin-top:0}.angle-address,.tof-address,.joystick-address,.joystick-invert{grid-column:1/-1}.joystick-invert{display:flex;gap:18px;flex-wrap:wrap}.joystick-invert label{display:flex;align-items:center;gap:6px;margin:0}.joystick-invert input{width:auto;margin:0}
 .joy{border-left:5px solid #e83e8c;padding-left:10px;margin-top:12px}
 .device{border-left:5px solid #6f42c1}
@@ -870,7 +1192,9 @@ const JA=__JA__;const tx=(en,ja)=>JA?ja:en;const MAX_MSG=8;const enc=new TextEnc
 function bytes(v){return enc.encode(v).length}
 function toggleMode(pr,sq,sel){if(!pr||!sq)return;if(sel.value==='1'){pr.style.display='none';sq.style.display='block';}else{pr.style.display='block';sq.style.display='none';}}
 function toggleClickMode(prId,sqId,sel){toggleMode(document.getElementById(prId),document.getElementById(sqId),sel);}
-function updateEncoderMode(sel){let enc=sel.closest('.enc'),showAbsolute=sel.value==='0';if(!enc)return;enc.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.classList.toggle('encoder-mode-hidden',!showAbsolute))}
+function updateEncoderMode(sel){let card=sel.closest('.enc');if(!card)return;if(card.classList.contains('encoder-v2')){let amount=sel.value==='0';card.classList.toggle('encoder-v2-amount-active',amount);card.querySelectorAll('.encoder-v2-amount').forEach(x=>x.classList.toggle('encoder-mode-hidden',!amount));card.querySelectorAll('.encoder-v2-direction').forEach(x=>x.classList.toggle('encoder-mode-hidden',amount));return}let showAbsolute=sel.value==='0';card.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.classList.toggle('encoder-mode-hidden',!showAbsolute))}
+function startEncoderV2Migration(index,uid){location.href='/?encoder_v2_migration='+encodeURIComponent(index)+'&encoder_uid='+encodeURIComponent(uid)}
+function validateEncoderV2(card){if(!card||!card.classList.contains('encoder-v2'))return true;let ok=true,mode=card.querySelector('.encoder-v2-rotation-mode').value,type=card.querySelector('.encoder-v2-output-type').value;if(mode==='0'){let min=card.querySelector('.encoder-v2-output-min input'),max=card.querySelector('.encoder-v2-output-max input');if(!validateNumericInput(min))ok=false;if(!validateNumericInput(max))ok=false;let relation='';if(ok&&!(Number(min.value)<Number(max.value)))relation=tx('Minimum must be less than Maximum','最小値は最大値より小さくしてください');if(!sequenceFieldError(max,relation))ok=false;if(type==='1'&&!relation){for(let input of [min,max]){let rounded=Math.round(Math.abs(Number(input.value)))*Math.sign(Number(input.value));if(rounded<-2147483648||rounded>2147483647){sequenceFieldError(input,tx('Mapped Int values must fit in OSC int32','変換後のInt値はOSC int32の範囲内にしてください'));ok=false}}}}else{card.querySelectorAll('.encoder-v2-direction-value').forEach(field=>{let input=field.querySelector('input'),error='',value=input.value.trim();if(bytes(input.value)>128)error=tx('Keep the value within 128 bytes in UTF-8','値はUTF-8で128バイト以内にしてください');else if(type==='0'){let n=Number(value),f=Math.fround(n);if(!value||!Number.isFinite(n)||!Number.isFinite(f)||(n!==0&&f===0))error=tx('Enter a finite OSC float32 value','有限のOSC float32値を入力してください')}else if(type==='1'){if(!/^[+-]?\d+$/.test(value))error=tx('Enter a decimal OSC int32','OSC int32の10進整数を入力してください');else{let n=BigInt(value);if(n<-2147483648n||n>2147483647n)error=tx('Int must be between -2147483648 and 2147483647','Intは-2147483648～2147483647の範囲で入力してください')}}sequenceFieldError(input,error);if(error)ok=false})}return ok}
 function showEvent(group,event,btn){document.querySelectorAll('.event-panel[data-group="'+group+'"]').forEach(x=>x.style.display=x.dataset.event===event?'block':'none');btn.parentNode.querySelectorAll('.event-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function allRows(group){return document.querySelectorAll('.osc-row[data-group="'+group+'"]')}
 function renumber(group){let rows=allRows(group),prefix=rows.length?rows[0].dataset.prefix:document.querySelector('.add-msg[data-group="'+group+'"]').dataset.prefix,idx=group.substring(prefix.length);['press','release'].forEach(ev=>{document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="'+ev+'"]').forEach((r,i)=>{let p=prefix+(ev==='press'?'p':'r');r.querySelector('.msg-address').name=p+'a_'+idx+'_'+i;r.querySelector('.type').name=p+'t_'+idx+'_'+i;r.querySelector('.msg-value').name=p+'v_'+idx+'_'+i})});let n=rows.length;document.getElementById('count_'+group).textContent=n;document.getElementById('pc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="press"]').length;document.getElementById('rc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="release"]').length;document.querySelectorAll('.add-msg[data-group="'+group+'"]').forEach(b=>b.disabled=n>=MAX_MSG)}
@@ -890,9 +1214,10 @@ function validateSequence(box){let fields=box.querySelectorAll('input[type=numbe
 document.addEventListener('input',event=>{let box=event.target.closest&&event.target.closest('.sequence-card');if(box&&event.target.matches('input[type=number]'))validateSequence(box)})
 function initializeMessageRows(){let groups=new Set();document.querySelectorAll('.osc-row').forEach(row=>{groups.add(row.dataset.group);validateInput(row.querySelector('.msg-address'));validateInput(row.querySelector('.msg-value'))});document.querySelectorAll('.add-msg[data-group]').forEach(button=>groups.add(button.dataset.group));groups.forEach(group=>renumber(group));document.querySelectorAll('.osc-address').forEach(validateInput)}
 function rememberScroll(){sessionStorage.setItem('m5osc-scroll',String(window.scrollY))}
-function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});document.querySelectorAll('.finite-float').forEach(i=>{if(!i.closest('.sequence-card')&&!validateNumericInput(i))ok=false});document.querySelectorAll('.bounded-integer').forEach(i=>{if(!validateIntegerInput(i))ok=false});document.querySelectorAll('.sequence-card').forEach(box=>{if(!validateSequence(box))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC fields.','赤く表示されたOSC設定項目を修正してください。'))}return ok}
+function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});document.querySelectorAll('.finite-float').forEach(i=>{if(!i.closest('.sequence-card')&&!i.closest('.encoder-v2')&&!validateNumericInput(i))ok=false});document.querySelectorAll('.bounded-integer').forEach(i=>{if(!validateIntegerInput(i))ok=false});document.querySelectorAll('.sequence-card').forEach(box=>{if(!validateSequence(box))ok=false});document.querySelectorAll('.encoder-v2').forEach(card=>{if(!validateEncoderV2(card))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted settings fields.','赤く表示された設定項目を修正してください。'))}return ok}
 let toastTimer;function showToast(message,success){let toast=document.getElementById('save-toast');toast.textContent=message;toast.className='toast '+(success?'success':'error')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),success?3000:6000)}
-async function saveSettings(event){event.preventDefault();if(!validateForm())return false;let form=event.currentTarget,button=form.querySelector('.save-bar button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));window.settingsSubmitting=true;button.disabled=true;button.textContent=tx('Saving...','保存中...');try{let response=await fetch('/save?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('Settings could not be saved.','設定を保存できませんでした。'));window.settingsDirty=false;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;showToast(message,true)}catch(error){showToast(error.message,false)}finally{window.settingsSubmitting=false;button.disabled=false;button.textContent=oldText}return false}
+function finishEncoderV2Migration(form){let states=form.querySelectorAll('input[name^="ev2m_"]');if(!states.length)return;states.forEach(state=>{let card=state.closest('.enc');if(card){let panel=card.querySelector('.encoder-migration-panel'),badge=card.querySelector('.encoder-model');if(panel)panel.remove();if(badge)badge.textContent=tx('V2 settings','V2設定')}state.remove()});history.replaceState(null,'',location.pathname)}
+async function saveSettings(event){event.preventDefault();if(!validateForm())return false;let form=event.currentTarget,button=form.querySelector('.save-bar button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));window.settingsSubmitting=true;button.disabled=true;button.textContent=tx('Saving...','保存中...');try{let response=await fetch('/save?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('Settings could not be saved.','設定を保存できませんでした。'));finishEncoderV2Migration(form);window.settingsDirty=false;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;showToast(message,true)}catch(error){showToast(error.message,false)}finally{window.settingsSubmitting=false;button.disabled=false;button.textContent=oldText}return false}
 async function deleteSavedDevice(event,form){event.preventDefault();if(!confirm(tx('Delete these settings?','この設定を削除しますか？')))return false;let button=form.querySelector('button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_device?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('The saved device settings could not be deleted.','保存済みデバイス設定を削除できませんでした。'));let card=form.closest('.saved-device-card');if(card)card.remove();showToast(message,true)}catch(error){button.disabled=false;button.textContent=oldText;showToast(error.message,false)}return false}
 async function deleteAllSettings(event){event.preventDefault();if(!confirm(tx('Delete all settings? This cannot be undone.','すべての設定を削除しますか？この操作は取り消せません。')))return false;window.settingsSubmitting=true;let button=event.currentTarget.querySelector('button');button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_all_settings',{method:'POST'}),message=await response.text();if(!response.ok)throw new Error(message);showToast(message,true)}catch(error){window.settingsSubmitting=false;button.disabled=false;button.textContent=tx('Delete All Settings','すべての設定を削除');showToast(error.message,false)}return false}
 function showImportError(status,reason){let message=tx('Import failed. The selected JSON file is not valid for this import.','インポートに失敗しました。選択したJSONファイルはこのインポートには使用できません。')+(reason?'\n\n'+reason:'');status.textContent=message.replace(/\n+/g,' ');alert(message)}
@@ -905,7 +1230,7 @@ function chooseDevicePreset(index){document.getElementById('preset-file-'+index)
 async function identifyDevice(index,uid){closeDeviceMenus();let status=document.getElementById('preset-status-'+index);status.textContent='';try{let body='index='+encodeURIComponent(index)+'&uid='+encodeURIComponent(uid),response=await fetch('/identify_device',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body}),message=await response.text();if(!response.ok)throw new Error(message);status.textContent=''}catch(e){status.textContent=e.message;alert(e.message)}}
 async function importDevicePreset(index,input){let status=document.getElementById('preset-status-'+index);if(!input.files.length)return;let file=input.files[0];if(file.size>16384){showImportError(status,tx('E_PRESET_FILE_TOO_LARGE: The preset file exceeds 16 KiB. Select a Device Preset JSON file no larger than 16 KiB.','E_PRESET_FILE_TOO_LARGE: プリセットファイルが16 KiBを超えています。16 KiB以内のDevice Preset JSONファイルを選択してください。'));input.value='';return}if(!confirm(tx('Apply this preset to the selected device? Its device settings will be overwritten.','選択したデバイスへこのプリセットを適用しますか？デバイス設定は上書きされます。'))){input.value='';return}status.textContent=tx('Importing preset...','プリセットをインポート中...');try{let body=await file.text(),response=await fetch('/import_device_preset?index='+index,{method:'POST',headers:{'Content-Type':'application/json'},body});let message=await response.text();if(!response.ok)throw new Error(message);status.textContent=message;window.settingsDirty=false;window.settingsSubmitting=true;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;setTimeout(()=>location.reload(),800)}catch(e){showImportError(status,e.message)}finally{input.value=''}}
 document.addEventListener('click',()=>closeDeviceMenus());
-function initializePage(){let form=document.getElementById('settings-form');if(form){form.addEventListener('input',markDirty);form.addEventListener('change',markDirty)}initializeMessageRows();document.querySelectorAll('.device[data-collapse-key]').forEach(card=>{let key=card.dataset.collapseKey,index=card.dataset.deviceIndex;if(sessionStorage.getItem('m5osc-collapse-'+key)==='1'){let body=document.getElementById('device-body-'+index),button=document.getElementById('collapse-'+index);body.hidden=true;button.classList.add('collapsed');button.setAttribute('aria-expanded','false')}});let saved=sessionStorage.getItem('m5osc-scroll');if(saved!==null){sessionStorage.removeItem('m5osc-scroll');requestAnimationFrame(()=>window.scrollTo(0,Number(saved)||0))}document.querySelectorAll('form:not(#settings-form)').forEach(f=>f.addEventListener('submit',rememberScroll))}
+function initializePage(){let form=document.getElementById('settings-form');if(form){form.addEventListener('input',markDirty);form.addEventListener('change',markDirty);if(form.querySelector('input[name^="ev2m_"]'))history.replaceState(null,'',location.pathname)}initializeMessageRows();document.querySelectorAll('.device[data-collapse-key]').forEach(card=>{let key=card.dataset.collapseKey,index=card.dataset.deviceIndex;if(sessionStorage.getItem('m5osc-collapse-'+key)==='1'){let body=document.getElementById('device-body-'+index),button=document.getElementById('collapse-'+index);body.hidden=true;button.classList.add('collapsed');button.setAttribute('aria-expanded','false')}});let saved=sessionStorage.getItem('m5osc-scroll');if(saved!==null){sessionStorage.removeItem('m5osc-scroll');requestAnimationFrame(()=>window.scrollTo(0,Number(saved)||0))}document.querySelectorAll('form:not(#settings-form)').forEach(f=>f.addEventListener('submit',rememberScroll))}
 window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListener('pageshow',()=>window.settingsSubmitting=false);window.addEventListener('beforeunload',e=>{if(window.settingsDirty&&!window.settingsSubmitting){e.preventDefault();e.returnValue=''}});window.addEventListener('DOMContentLoaded',initializePage)
 </script></head><body><main><div id='save-toast' class='toast' role='status' aria-live='polite'></div><h1>M5ChainOSC Settings</h1>
 )raw";
@@ -988,7 +1313,28 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     if (!devices[i].active) continue;
     String idx = String(i);
     bool isSeq = devices[i].mode == MODE_SEQUENCE;
-    bool encSeq = devices[i].enc.clickMode == MODE_SEQUENCE;
+    EncoderOscConfig encoderUi = devices[i].enc;
+    bool encoderMigrationEditing = false;
+    bool encoderMigrationLossless = false;
+    if (devices[i].type == CHAIN_ENCODER_TYPE_CODE &&
+        devices[i].enc.settingsModel == ENCODER_SETTINGS_LEGACY &&
+        server.hasArg("encoder_v2_migration") &&
+        server.arg("encoder_v2_migration") == idx &&
+        server.hasArg("encoder_uid") &&
+        server.arg("encoder_uid") == devices[i].uid) {
+      encoderMigrationEditing = true;
+      encoderMigrationLossless =
+          buildEncoderV2MigrationCandidate(devices[i].enc, encoderUi);
+      if (!encoderMigrationLossless) {
+        ChainDevice defaultDevice;
+        setDefaultDeviceMessages(defaultDevice);
+        encoderUi = defaultDevice.enc;
+        encoderUi.settingsModel = ENCODER_SETTINGS_V2;
+      }
+    }
+    bool encSeq = (encoderUi.settingsModel == ENCODER_SETTINGS_V2
+                       ? encoderUi.pushMode
+                       : encoderUi.clickMode) == MODE_SEQUENCE;
     bool joySeq = devices[i].joy.clickMode == MODE_SEQUENCE;
     bool ph = isPlaceholderUid(devices[i].uid);
 
@@ -1031,30 +1377,59 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += finiteFloatInputHtml(tr("Step", "増減量"), "sp_" + idx, devices[i].seq.step);
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
-      html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong><div class='encoder-grid'>";
-      html += addressInputHtml(tr("Rotation Address", "回転OSCアドレス"),
-                               "er_" + idx, devices[i].enc.rotAddr,
+      const bool encoderV2 = encoderUi.settingsModel == ENCODER_SETTINGS_V2;
+      html += "<div class='enc" + String(encoderV2 ? " encoder-v2" : "") + String(encoderV2 && encoderUi.rotationMode == ENCODER_ROTATION_AMOUNT ? " encoder-v2-amount-active" : "") + "'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong>";
+      html += "<span class='encoder-model" + String(encoderV2 ? " encoder-model-v2" : "") + "'>" + String(encoderMigrationEditing ? tr("V2 migration candidate", "V2移行候補") : encoderV2 ? tr("V2 settings", "V2設定") : tr("Legacy settings", "旧形式の設定")) + "</span>";
+      if (!encoderV2)
+        html += "<button class='encoder-migration-action' type='button' onclick=\"startEncoderV2Migration(" + idx + ",'" + htmlEscape(devices[i].uid) + "')\">" + String(tr("Migrate to v2 settings", "v2設定へ移行する")) + "</button>";
+      if (encoderMigrationEditing) {
+        html += "<div class='encoder-migration-panel'><p class='note" + String(encoderMigrationLossless ? "" : " warning") + "'>" + String(encoderMigrationLossless
+            ? tr("A lossless V2 migration candidate was created. The current settings remain unchanged until this form is saved successfully.", "現在の動作を維持するV2移行候補を作成しました。このフォームの保存が成功するまで現在の設定は変更されません。")
+            : tr("This setting cannot be converted automatically to V2 without changing its current behavior. Create and review valid V2 settings manually. The current settings remain unchanged until this form is saved successfully.", "この設定は現在の動作を変えずにv2へ自動変換できません。有効なV2設定を手動で作成・確認してください。このフォームの保存が成功するまで現在の設定は変更されません。")) + "</p><a class='encoder-migration-cancel' href='/'>" + String(tr("Return to Legacy settings", "旧形式の設定へ戻る")) + "</a></div>";
+        html += "<input type='hidden' name='ev2m_" + idx + "' value='1'>";
+      }
+      html += "<div class='encoder-grid'>";
+      html += addressInputHtml(encoderV2 ? tr("OSC Address", "OSCアドレス") : tr("Rotation Address", "回転OSCアドレス"),
+                               "er_" + idx, encoderUi.rotAddr,
                                "encoder-address");
-      html += "<div><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
-      html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
-      const String absoluteHiddenClass = devices[i].enc.sendIncrement ? " encoder-mode-hidden" : "";
-      html += finiteFloatInputHtml(tr("Abs In Min", "絶対値入力の最小値"), "e0_" + idx, devices[i].enc.absInMin, "encoder-absolute-setting" + absoluteHiddenClass);
-      html += finiteFloatInputHtml(tr("Abs In Max", "絶対値入力の最大値"), "e1_" + idx, devices[i].enc.absInMax, "encoder-absolute-setting" + absoluteHiddenClass);
-      html += "<label class='encoder-absolute-setting wrap-setting" + absoluteHiddenClass + "'><input type='checkbox' name='ew_" + idx + "'" + String(devices[i].enc.wrapAround ? " checked" : "") + "> " + String(tr("Wrap around", "範囲をループする")) + "</label>";
-      html += finiteFloatInputHtml(tr("Inc Scale", "増分倍率"), "es_" + idx, devices[i].enc.incScale);
-      html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "eo_" + idx, devices[i].enc.map.outMin);
-      html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "eO_" + idx, devices[i].enc.map.outMax);
-      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div></div></div>";
-      html += "<div class='click-section encoder-click'>";
-      html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
-      html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
-      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong><div class='seq-grid'>";
+      if (!encoderV2) {
+        html += "<div><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!encoderUi.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
+        html += "<option value='1'" + String(encoderUi.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
+        const String absoluteHiddenClass = encoderUi.sendIncrement ? " encoder-mode-hidden" : "";
+        html += finiteFloatInputHtml(tr("Abs In Min", "絶対値入力の最小値"), "e0_" + idx, encoderUi.absInMin, "encoder-absolute-setting" + absoluteHiddenClass);
+        html += finiteFloatInputHtml(tr("Abs In Max", "絶対値入力の最大値"), "e1_" + idx, encoderUi.absInMax, "encoder-absolute-setting" + absoluteHiddenClass);
+        html += "<label class='encoder-absolute-setting wrap-setting" + absoluteHiddenClass + "'><input type='checkbox' name='ew_" + idx + "'" + String(encoderUi.wrapAround ? " checked" : "") + "> " + String(tr("Wrap around", "範囲をループする")) + "</label>";
+        html += finiteFloatInputHtml(tr("Inc Scale", "増分倍率"), "es_" + idx, encoderUi.incScale);
+        html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "eo_" + idx, encoderUi.map.outMin);
+        html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "eO_" + idx, encoderUi.map.outMax);
+        html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, encoderUi.map.outType) + "</div>";
+      } else {
+        const bool amountMode = encoderUi.rotationMode == ENCODER_ROTATION_AMOUNT;
+        html += "<div class='encoder-v2-mode'><label>" + String(tr("Mode", "モード")) + "</label><select class='encoder-v2-rotation-mode' name='evm_" + idx + "' onchange='updateEncoderMode(this);validateEncoderV2(this.closest(\".enc\"))'>";
+        html += "<option value='0'" + String(amountMode ? " selected" : "") + ">" + String(tr("Rotation Amount", "回転量")) + "</option><option value='1'" + String(!amountMode ? " selected" : "") + ">" + String(tr("Rotation Direction", "回転方向")) + "</option></select></div>";
+        const String amountHidden = amountMode ? "" : " encoder-mode-hidden";
+        const String directionHidden = amountMode ? " encoder-mode-hidden" : "";
+        html += finiteFloat32InputHtml(tr("Minimum", "最小値"), "evn_" + idx, encoderUi.outputMin, "encoder-v2-amount encoder-v2-output-min" + amountHidden);
+        html += finiteFloat32InputHtml(tr("Maximum", "最大値"), "evx_" + idx, encoderUi.outputMax, "encoder-v2-amount encoder-v2-output-max" + amountHidden);
+        html += "<div class='encoder-v2-amount" + amountHidden + "'><label>" + String(tr("Beyond Minimum / Maximum", "最小値・最大値の先")) + "</label><select name='evw_" + idx + "'><option value='1'" + String(encoderUi.wrapAround ? " selected" : "") + ">" + String(tr("Loop", "🔄 ループする")) + "</option><option value='0'" + String(!encoderUi.wrapAround ? " selected" : "") + ">" + String(tr("Stop", "🛑 停止する")) + "</option></select></div>";
+        html += boundedIntegerInputHtml(tr("Range Steps", "範囲ステップ数"), "evs_" + idx, encoderUi.rangeSteps, 1, 65535, "encoder-v2-amount" + amountHidden);
+        html += "<div class='encoder-v2-amount encoder-v2-increase-direction" + amountHidden + "'><label>" + String(tr("Increase Direction", "回転方向")) + "</label><select name='evi_" + idx + "'><option value='0'" + String(!encoderUi.clockwiseIncreases ? " selected" : "") + ">" + String(tr("Counter-clockwise increases", "↪️ 反時計回りで大きくなる")) + "</option><option value='1'" + String(encoderUi.clockwiseIncreases ? " selected" : "") + ">" + String(tr("Clockwise increases", "↩️ 時計回りで大きくなる")) + "</option></select></div>";
+        html += "<div class='encoder-v2-direction encoder-v2-direction-value" + directionHidden + "'><label>" + String(tr("↪️ Counter-clockwise Value", "↪️ 反時計回りの値")) + "</label><input maxlength='128' name='evq_" + idx + "' value='" + htmlEscape(encoderUi.counterClockwiseValue) + "' oninput='limitBytes(this,128);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
+        html += "<div class='encoder-v2-direction encoder-v2-direction-value" + directionHidden + "'><label>" + String(tr("↩️ Clockwise Value", "↩️ 時計回りの値")) + "</label><input maxlength='128' name='evc_" + idx + "' value='" + htmlEscape(encoderUi.clockwiseValue) + "' oninput='limitBytes(this,128);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
+        html += "<div class='encoder-v2-type'><label>" + String(tr("Type", "型")) + "</label><select class='encoder-v2-output-type' name='evt_" + idx + "' onchange='validateEncoderV2(this.closest(\".enc\"))'><option value='0'" + String(encoderUi.outputType == TYPE_FLOAT ? " selected" : "") + ">Float</option><option value='1'" + String(encoderUi.outputType == TYPE_INT ? " selected" : "") + ">Int</option><option value='2'" + String(encoderUi.outputType == TYPE_STRING ? " selected" : "") + ">String</option></select></div>";
+      }
+      html += "</div></div><div class='click-section encoder-click'><strong>" + String(encoderV2 ? tr("Encoder Push", "エンコーダープッシュ") : tr("Encoder Click", "エンコーダークリック")) + "</strong>";
+      html += encoderV2 ? pushModeHtml("epm_" + idx, encoderUi.pushMode, "epr_" + idx, "esq_" + idx) : clickModeHtml("em_" + idx, encoderUi.clickMode, "epr_" + idx, "esq_" + idx);
+      html += clickMessagesHtml(idx,"e",encSeq,encoderUi.pressMessages,encoderUi.pressMessageCount,encoderUi.releaseMessages,encoderUi.releaseMessageCount);
+      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(encoderV2 ? tr("Push Sequence", "プッシュシーケンス") : tr("Click Sequence", "クリックシーケンス")) + "</strong>";
+      if (encoderV2) html += "<p class='note'>" + String(tr("Advance from Start by Step and return to Start after passing End.", "開始値から増減量ずつ進み、終了値を超えると開始値へ戻ります。")) + "</p>";
+      html += "<div class='seq-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "ek_" + idx,
-                               devices[i].enc.clickSeq.address, "seq-address");
-      html += finiteFloatInputHtml(tr("Start", "開始値"), "en_" + idx, devices[i].enc.clickSeq.start);
-      html += finiteFloatInputHtml(tr("End", "終了値"), "e2_" + idx, devices[i].enc.clickSeq.end);
-      html += finiteFloatInputHtml(tr("Step", "増減量"), "e3_" + idx, devices[i].enc.clickSeq.step);
-      html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, devices[i].enc.clickSeq.valueType) + "</div></div></div></div>";
+                               encoderUi.clickSeq.address, "seq-address");
+      html += finiteFloatInputHtml(tr("Start", "開始値"), "en_" + idx, encoderUi.clickSeq.start);
+      html += finiteFloatInputHtml(tr("End", "終了値"), "e2_" + idx, encoderUi.clickSeq.end);
+      html += finiteFloatInputHtml(tr("Step", "増減量"), "e3_" + idx, encoderUi.clickSeq.step);
+      html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, encoderUi.clickSeq.valueType) + "</div></div></div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong><div class='angle-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "aa_" + idx,
@@ -1170,14 +1545,17 @@ void handleSave() {
     if (!devices[i].active) continue;
     String idx = String(i);
     if (!server.hasArg("uid_" + idx)) continue;
+    String candidateDisplayName = devices[i].displayName;
     if (server.hasArg("nm_" + idx)) {
-      devices[i].displayName = server.arg("nm_" + idx);
-      devices[i].displayName.trim();
-      if (devices[i].displayName.length() > MAX_DEVICE_NAME_BYTES) {
+      candidateDisplayName = server.arg("nm_" + idx);
+      candidateDisplayName.trim();
+      if (candidateDisplayName.length() > MAX_DEVICE_NAME_BYTES) {
         sendUiResult(400, tr("Save error", "保存エラー"), tr("Device Name is too long. Reduce it and try again.", "デバイス名が長すぎます。短くしてからもう一度お試しください。"));
         return;
       }
     }
+    if (devices[i].type != CHAIN_ENCODER_TYPE_CODE)
+      devices[i].displayName = candidateDisplayName;
 
     if (devices[i].type == CHAIN_KEY_TYPE_CODE) {
       ChainDevice candidate = devices[i];
@@ -1222,37 +1600,147 @@ void handleSave() {
       }
       devices[i] = candidate;
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
+      const bool encoderMigrationSave =
+          devices[i].enc.settingsModel == ENCODER_SETTINGS_LEGACY &&
+          server.hasArg("ev2m_" + idx) &&
+          server.arg("ev2m_" + idx) == "1";
       EncoderOscConfig candidate = devices[i].enc;
+      if (encoderMigrationSave &&
+          !buildEncoderV2MigrationCandidate(devices[i].enc, candidate)) {
+        ChainDevice defaultDevice;
+        setDefaultDeviceMessages(defaultDevice);
+        candidate = defaultDevice.enc;
+        candidate.settingsModel = ENCODER_SETTINGS_V2;
+      }
       if (server.hasArg("er_" + idx)) candidate.rotAddr = server.arg("er_" + idx);
       candidate.rotAddr.trim();
       String validationError;
       if (!validOscAddressText(candidate.rotAddr, validationError)) {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Rotation Address: ", "エンコーダー回転OSCアドレス: ")) + validationError); return;
       }
-      if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
-      candidate.wrapAround = server.hasArg("ew_" + idx);
-      if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
-          !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
-          !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
-          !parseFiniteFloatArg("eo_" + idx, candidate.map.outMin) ||
-          !parseFiniteFloatArg("eO_" + idx, candidate.map.outMax)) {
-        sendUiResult(400, tr("Save error", "保存エラー"),
-                     tr("Encoder rotation values must be finite values representable as 32-bit floating-point numbers.",
-                        "エンコーダー回転の数値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
-        return;
+      const bool encoderV2 = candidate.settingsModel == ENCODER_SETTINGS_V2;
+      if (encoderV2) {
+        if (!server.hasArg("evm_" + idx) || !server.hasArg("evt_" + idx) ||
+            !server.hasArg("epm_" + idx)) {
+          sendUiResult(400, tr("Save error", "保存エラー"),
+                       tr("Required Encoder v2 settings are missing.",
+                          "Encoder v2の必須設定が不足しています。"));
+          return;
+        }
+        const int rotationMode = server.arg("evm_" + idx).toInt();
+        const int outputType = server.arg("evt_" + idx).toInt();
+        const int pushMode = server.arg("epm_" + idx).toInt();
+        if (rotationMode < ENCODER_ROTATION_AMOUNT ||
+            rotationMode > ENCODER_ROTATION_DIRECTION ||
+            outputType < TYPE_FLOAT || outputType > TYPE_STRING ||
+            pushMode < MODE_PRESS_RELEASE || pushMode > MODE_SEQUENCE) {
+          sendUiResult(400, tr("Save error", "保存エラー"),
+                       tr("Encoder v2 mode or type is invalid.",
+                          "Encoder v2のモードまたは型が正しくありません。"));
+          return;
+        }
+        candidate.rotationMode = (EncoderRotationMode)rotationMode;
+        candidate.outputType = (ValueType)outputType;
+        candidate.pushMode = (KeyMode)pushMode;
+        candidate.clickMode = candidate.pushMode;
+
+        if (candidate.rotationMode == ENCODER_ROTATION_AMOUNT) {
+          int rangeSteps = 0;
+          if (!parseBoundedIntegerArg("evs_" + idx, 1, 65535,
+                                      rangeSteps) ||
+              !server.hasArg("evw_" + idx) ||
+              !server.hasArg("evi_" + idx)) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Range Steps must be an integer from 1 to 65535.",
+                            "範囲ステップ数は1～65535の整数で入力してください。"));
+            return;
+          }
+          const String wrapValue = server.arg("evw_" + idx);
+          const String increaseValue = server.arg("evi_" + idx);
+          if ((wrapValue != "0" && wrapValue != "1") ||
+              (increaseValue != "0" && increaseValue != "1")) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Encoder v2 Amount options are invalid.",
+                            "Encoder v2回転量の選択値が正しくありません。"));
+            return;
+          }
+          candidate.rangeSteps = (uint16_t)rangeSteps;
+          candidate.wrapAround = wrapValue == "1";
+          candidate.clockwiseIncreases = increaseValue == "1";
+          if (!parseFiniteFloatArg("evn_" + idx, candidate.outputMin) ||
+              !parseFiniteFloatArg("evx_" + idx, candidate.outputMax)) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Minimum and Maximum must be finite values representable as 32-bit floating-point numbers.",
+                            "最小値と最大値には有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+            return;
+          }
+        } else {
+          if (!server.hasArg("evc_" + idx) || !server.hasArg("evq_" + idx)) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Direction values are missing.",
+                            "回転方向の値が不足しています。"));
+            return;
+          }
+          candidate.clockwiseValue = server.arg("evc_" + idx);
+          candidate.counterClockwiseValue = server.arg("evq_" + idx);
+        }
+      } else {
+        if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
+        candidate.wrapAround = server.hasArg("ew_" + idx);
+        if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
+            !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
+            !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
+            !parseFiniteFloatArg("eo_" + idx, candidate.map.outMin) ||
+            !parseFiniteFloatArg("eO_" + idx, candidate.map.outMax)) {
+          sendUiResult(400, tr("Save error", "保存エラー"),
+                       tr("Encoder rotation values must be finite values representable as 32-bit floating-point numbers.",
+                          "エンコーダー回転の数値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+          return;
+        }
+        if (server.hasArg("et_" + idx)) candidate.map.outType = (ValueType)server.arg("et_" + idx).toInt();
+        if (server.hasArg("em_" + idx)) candidate.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
       }
-      if (server.hasArg("et_" + idx)) candidate.map.outType = (ValueType)server.arg("et_" + idx).toInt();
-      if (server.hasArg("em_" + idx)) candidate.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
       if (!parseMessageList(idx,"e",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
       if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
       if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
       if (!parseSequenceForm("ek_" + idx, "en_" + idx, "e2_" + idx,
                              "e3_" + idx, "el_" + idx,
                              candidate.clickSeq, validationError)) {
-        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Click Sequence: ", "エンコーダークリックシーケンス: ")) + validationError); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), String(encoderV2 ? tr("Encoder Push Sequence: ", "エンコーダープッシュシーケンス: ") : tr("Encoder Click Sequence: ", "エンコーダークリックシーケンス: ")) + validationError); return;
       }
-      devices[i].enc = candidate;
-      devices[i].boundedEncInited = false;
+      if (encoderV2 && !encoderV2SettingsAreValid(candidate)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("Encoder v2 settings are invalid. Check the output range and values for the selected type.",
+                        "Encoder v2設定が正しくありません。選択した型の出力範囲と値を確認してください。"));
+        return;
+      }
+      ChainDevice deviceCandidate = devices[i];
+      deviceCandidate.displayName = candidateDisplayName;
+      deviceCandidate.enc = candidate;
+      if (!isPlaceholderUid(deviceCandidate.uid)) {
+        if (!canRegisterKnownDevice(deviceCandidate.uid,
+                                    deviceCandidate.type)) {
+          sendUiResult(
+              409, tr("Save error", "保存エラー"),
+              String(tr("The device settings exceed the per-type limit of ",
+                        "デバイスの設定が種別ごとの上限")) +
+                  String(MAX_KNOWN_PER_TYPE) +
+                  String(tr(".", "件を超えています。")));
+          return;
+        }
+#if TEST_FORCE_ENCODER_SAVE_FAILURE
+        const bool encoderSettingsSaved = false;
+#else
+        const bool encoderSettingsSaved = saveDeviceSettings(deviceCandidate);
+#endif
+        if (!encoderSettingsSaved) {
+          sendUiResult(507, tr("Save error", "保存エラー"), tr("The device configuration could not be written to storage. Delete messages or shorten Address and Value fields, then try again.", "デバイス設定をストレージへ書き込めませんでした。メッセージを削除するか、AddressとValueを短くしてからもう一度お試しください。"));
+          return;
+        }
+      }
+      devices[i] = deviceCandidate;
+      if (!encoderV2) devices[i].boundedEncInited = false;
+      continue;
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       AngleOscConfig candidate = devices[i].angle;
       if (server.hasArg("aa_" + idx)) candidate.addr = server.arg("aa_" + idx);
@@ -1453,6 +1941,18 @@ void handleExportDevicePreset() {
     return;
   }
 
+  if (devices[index].type == CHAIN_ENCODER_TYPE_CODE &&
+      devices[index].enc.settingsModel == ENCODER_SETTINGS_V2) {
+    String validationError;
+    if (!encoderV2ExportIsValid(devices[index], validationError)) {
+      server.send(500, "text/plain; charset=utf-8",
+                  String(tr("The Device Preset could not be exported: ",
+                            "Device Presetをエクスポートできませんでした: ")) +
+                      validationError);
+      return;
+    }
+  }
+
   String typeName = String(typeToName(devices[index].type));
   typeName.replace(" ", "-");
   server.sendHeader("Content-Disposition", "attachment; filename=\"ChainOSC-" + typeName + "-preset.json\"");
@@ -1508,8 +2008,17 @@ void handleImportDevicePreset() {
                    "E_PRESET_FORMAT_INVALID: 対応するChainOSC Device Presetではありません。`format`が`ChainOSC-device-preset`であることを確認してください。"));
     return;
   }
-  if (!root["schemaVersion"].is<int>() ||
-      root["schemaVersion"].as<int>() != DEVICE_PRESET_SCHEMA_VERSION) {
+  if (!root["schemaVersion"].is<int>()) {
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_SCHEMA_UNSUPPORTED: The preset `schemaVersion` is missing or unsupported. Use a preset exported by a compatible product version.",
+                   "E_PRESET_SCHEMA_UNSUPPORTED: プリセットの`schemaVersion`がないか、対応していません。対応するバージョンの製品からエクスポートしたプリセットを使用してください。"));
+    return;
+  }
+  const int presetSchemaVersion = root["schemaVersion"].as<int>();
+  const bool legacyPreset = presetFormat == LEGACY_DEVICE_PRESET_FORMAT_NAME;
+  if ((presetSchemaVersion != DEVICE_PRESET_SCHEMA_VERSION &&
+       presetSchemaVersion != DEVICE_PRESET_SCHEMA_VERSION_V2) ||
+      (legacyPreset && presetSchemaVersion != DEVICE_PRESET_SCHEMA_VERSION)) {
     server.send(400, "text/plain; charset=utf-8",
                 tr("E_PRESET_SCHEMA_UNSUPPORTED: The preset `schemaVersion` is missing or unsupported. Use a preset exported by a compatible product version.",
                    "E_PRESET_SCHEMA_UNSUPPORTED: プリセットの`schemaVersion`がないか、対応していません。対応するバージョンの製品からエクスポートしたプリセットを使用してください。"));
@@ -1528,6 +2037,38 @@ void handleImportDevicePreset() {
                    "E_PRESET_DEVICE_TYPE_MISMATCH: プリセットのデバイス種類がインポート先と一致しません。選択したデバイスと同じ種類のプリセットを使用してください。"));
     return;
   }
+  if (!root["deviceTypeName"].is<const char*>()) {
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_REQUIRED_FIELD_MISSING: A required preset field is missing. Use a file that contains all required fields.",
+                   "E_PRESET_REQUIRED_FIELD_MISSING: プリセットに必須項目がありません。必須項目をすべて含むファイルを使用してください。"));
+    return;
+  }
+  if (String(root["deviceTypeName"].as<const char*>()) !=
+      String(typeToName(devices[index].type))) {
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_DEVICE_SETTING_INVALID: `deviceTypeName` does not match `deviceType`.",
+                   "E_PRESET_DEVICE_SETTING_INVALID: `deviceTypeName`が`deviceType`と一致しません。"));
+    return;
+  }
+  if (presetSchemaVersion == DEVICE_PRESET_SCHEMA_VERSION_V2 &&
+      root["deviceType"].as<int>() != CHAIN_ENCODER_TYPE_CODE) {
+    server.send(400, "text/plain; charset=utf-8",
+                tr("E_PRESET_DEVICE_TYPE_UNSUPPORTED: Device Preset v2 import is currently supported for Encoder devices only.",
+                   "E_PRESET_DEVICE_TYPE_UNSUPPORTED: Device Preset v2のインポートは現在Encoderのみ対応しています。"));
+    return;
+  }
+  if (!legacyPreset && root["deviceType"].as<int>() == CHAIN_ENCODER_TYPE_CODE) {
+    static const char* const encoderRootFields[] = {
+        "format", "schemaVersion", "deviceType", "deviceTypeName", "encoder"};
+    String shapeError;
+    JsonObjectConst rootView = root;
+    if (!hasOnlyPresetFields(rootView, encoderRootFields, 5, shapeError)) {
+      server.send(400, "text/plain; charset=utf-8",
+                  String(tr("Invalid preset: ", "プリセットが正しくありません: ")) +
+                      shapeError);
+      return;
+    }
+  }
 
   // A preset intentionally has no identity. Bind it only to the device card
   // selected by the user, while preserving that device's local name.
@@ -1542,13 +2083,22 @@ void handleImportDevicePreset() {
   }
   String validationError;
   JsonObjectConst presetObject = root;
-  const bool legacyPreset = presetFormat == LEGACY_DEVICE_PRESET_FORMAT_NAME;
-  if (!deviceFromJson(presetObject, *candidate, validationError,
-                      legacyPreset)) {
+  const bool parsed = presetSchemaVersion == DEVICE_PRESET_SCHEMA_VERSION_V2
+      ? deviceFromPresetV2Encoder(presetObject, *candidate, validationError)
+      : deviceFromJson(presetObject, *candidate, validationError, legacyPreset);
+  if (!parsed) {
     delete candidate;
     server.send(400, "text/plain; charset=utf-8", String(tr("Invalid preset: ", "プリセットが正しくありません: ")) + validationError);
     return;
   }
+  if (presetSchemaVersion == DEVICE_PRESET_SCHEMA_VERSION &&
+      !legacyPreset && candidate->type == CHAIN_ENCODER_TYPE_CODE) {
+    EncoderOscConfig migrated;
+    if (buildEncoderV2MigrationCandidate(candidate->enc, migrated))
+      candidate->enc = migrated;
+  }
+  const bool importedV2 = candidate->type == CHAIN_ENCODER_TYPE_CODE &&
+                          candidate->enc.settingsModel == ENCODER_SETTINGS_V2;
   if (!saveDeviceSettings(*candidate)) {
     delete candidate;
     server.send(507, "text/plain; charset=utf-8",
@@ -1559,6 +2109,7 @@ void handleImportDevicePreset() {
   delete candidate;
 
   loadDeviceSettings(devices[index]);
+  if (importedV2) resetEncoderV2Runtime(devices[index]);
   MEMORY_DEBUG_JSON("PRESET_END", 0, document);
   server.send(200, "text/plain; charset=utf-8",
               String(tr("Preset imported for ", "プリセットをインポートしました: ")) + String(typeToName(devices[index].type)) + ".");

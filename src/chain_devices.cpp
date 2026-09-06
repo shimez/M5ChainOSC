@@ -3,6 +3,7 @@
 #include "storage.h"
 #include "osc_send.h"
 #include "display.h"
+#include <ctype.h>
 
 static void sendMessagesWithFeedback(const ChainDevice& device,
                                      const OSCMessage* messages,
@@ -15,6 +16,102 @@ static void sendMessagesWithFeedback(const ChainDevice& device,
   if (sentCount > 0)
     queueOscFeedback(deviceDisplayName(device), sentMessages, sentCount);
 }
+
+namespace {
+constexpr uint8_t ENCODER_V2_CACHE_CAPACITY = 16;
+
+struct EncoderV2CacheEntry {
+  bool used = false;
+  bool connected = false;
+  String uid;
+  EncoderV2RuntimeState state;
+  uint32_t lastUsed = 0;
+};
+
+EncoderV2CacheEntry encoderV2Cache[ENCODER_V2_CACHE_CAPACITY];
+uint32_t encoderV2CacheUseSerial = 0;
+
+bool hasStableEncoderUid(const ChainDevice& d) {
+  if (d.uid.length() != 24 || isPlaceholderUid(d.uid)) return false;
+  for (size_t i = 0; i < d.uid.length(); ++i)
+    if (!isxdigit((unsigned char)d.uid[i])) return false;
+  return true;
+}
+
+void touchEncoderV2CacheEntry(EncoderV2CacheEntry& entry) {
+  entry.lastUsed = ++encoderV2CacheUseSerial;
+}
+
+EncoderV2CacheEntry* findEncoderV2CacheEntry(const String& uid) {
+  for (uint8_t i = 0; i < ENCODER_V2_CACHE_CAPACITY; ++i)
+    if (encoderV2Cache[i].used && encoderV2Cache[i].uid == uid)
+      return &encoderV2Cache[i];
+  return nullptr;
+}
+
+EncoderV2CacheEntry* createEncoderV2CacheEntry(const String& uid) {
+  EncoderV2CacheEntry* slot = nullptr;
+  for (uint8_t i = 0; i < ENCODER_V2_CACHE_CAPACITY; ++i) {
+    if (!encoderV2Cache[i].used) {
+      slot = &encoderV2Cache[i];
+      break;
+    }
+  }
+  if (!slot) {
+    for (uint8_t i = 0; i < ENCODER_V2_CACHE_CAPACITY; ++i) {
+      EncoderV2CacheEntry& candidate = encoderV2Cache[i];
+      if (candidate.connected) continue;
+      if (!slot || candidate.lastUsed < slot->lastUsed) slot = &candidate;
+    }
+  }
+  if (!slot) return nullptr;  // All 16 entries belong to connected Encoders.
+  *slot = EncoderV2CacheEntry();
+  slot->used = true;
+  slot->uid = uid;
+  touchEncoderV2CacheEntry(*slot);
+  return slot;
+}
+
+EncoderV2CacheEntry* getEncoderV2CacheEntry(const String& uid) {
+  EncoderV2CacheEntry* entry = findEncoderV2CacheEntry(uid);
+  return entry ? entry : createEncoderV2CacheEntry(uid);
+}
+
+EncoderV2RuntimeState& encoderV2RuntimeFor(ChainDevice& d) {
+  if (!hasStableEncoderUid(d)) return d.encV2FallbackRuntime;
+  EncoderV2CacheEntry* entry = getEncoderV2CacheEntry(d.uid);
+  if (!entry) return d.encV2FallbackRuntime;
+  entry->connected = true;
+  touchEncoderV2CacheEntry(*entry);
+  return entry->state;
+}
+
+void disconnectAllEncoderV2CacheEntries() {
+  for (uint8_t i = 0; i < ENCODER_V2_CACHE_CAPACITY; ++i) {
+    if (!encoderV2Cache[i].used) continue;
+    encoderV2Cache[i].connected = false;
+    encoderV2Cache[i].state.inputContinuityValid = false;
+  }
+}
+
+void bindV2EncoderAfterRebuild(ChainDevice& d) {
+  if (d.type != CHAIN_ENCODER_TYPE_CODE ||
+      d.enc.settingsModel != ENCODER_SETTINGS_V2) return;
+  EncoderV2RuntimeState& state = encoderV2RuntimeFor(d);
+  state.inputContinuityValid = false;
+}
+
+void protectExistingV2EncoderAfterRebuild(ChainDevice& d) {
+  if (d.type != CHAIN_ENCODER_TYPE_CODE ||
+      d.enc.settingsModel != ENCODER_SETTINGS_V2 ||
+      !hasStableEncoderUid(d)) return;
+  EncoderV2CacheEntry* entry = findEncoderV2CacheEntry(d.uid);
+  if (!entry) return;
+  entry->connected = true;
+  entry->state.inputContinuityValid = false;
+  touchEncoderV2CacheEntry(*entry);
+}
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // Poll helpers
@@ -56,7 +153,7 @@ static void updateIdentifyLeds() {
   }
 }
 
-void pollEncoder(ChainDevice& d) {
+static void pollLegacyEncoderRotation(ChainDevice& d) {
   int16_t absv = 0;
   if (M5Chain.getEncoderValue(d.chainId, &absv) == CHAIN_OK) {
     if (!d.encInited) {
@@ -94,10 +191,161 @@ void pollEncoder(ChainDevice& d) {
       sendMappedOsc(deviceDisplayName(d), d.enc.rotAddr, mapped, d.enc.map.outType);
     }
   }
+}
+
+static bool amountSnapshotMatches(const EncoderV2RuntimeState& state,
+                                  const ChainDevice& d) {
+  return state.amountSnapshotValid &&
+         state.rangeSteps == d.enc.rangeSteps &&
+         state.wrap == d.enc.wrapAround &&
+         state.clockwiseIncreases == d.enc.clockwiseIncreases &&
+         state.outputMin == d.enc.outputMin &&
+         state.outputMax == d.enc.outputMax &&
+         state.outputType == d.enc.outputType;
+}
+
+static void captureAmountSnapshot(EncoderV2RuntimeState& state,
+                                  const ChainDevice& d) {
+  state.amountSnapshotValid = true;
+  state.rangeSteps = d.enc.rangeSteps;
+  state.wrap = d.enc.wrapAround;
+  state.clockwiseIncreases = d.enc.clockwiseIncreases;
+  state.outputMin = d.enc.outputMin;
+  state.outputMax = d.enc.outputMax;
+  state.outputType = d.enc.outputType;
+}
+
+void resetEncoderV2Runtime(ChainDevice& d) {
+  if (d.enc.settingsModel != ENCODER_SETTINGS_V2) return;
+  EncoderV2RuntimeState& state = encoderV2RuntimeFor(d);
+  state.logicalPosition = 0;
+  state.semanticsObserved = false;
+  state.amountSnapshotValid = false;
+}
+
+static void observeV2Semantics(EncoderV2RuntimeState& state, ChainDevice& d) {
+  if (d.enc.rotationMode == ENCODER_ROTATION_AMOUNT) {
+    const bool enteringAmount = !state.semanticsObserved ||
+                                state.observedMode != ENCODER_ROTATION_AMOUNT;
+    if (enteringAmount || !amountSnapshotMatches(state, d))
+      state.logicalPosition = 0;
+    captureAmountSnapshot(state, d);
+  }
+  state.observedMode = d.enc.rotationMode;
+  state.semanticsObserved = true;
+}
+
+static String amountStringValue(float value) {
+  String result(value, 3);
+  return result == "-0.000" ? String("0.000") : result;
+}
+
+static bool sendV2AmountValue(const ChainDevice& d, float mapped) {
+  const String& address = d.enc.rotAddr;
+  const String name = deviceDisplayName(d);
+  if (d.enc.outputType == TYPE_INT) {
+    const int32_t value = (int32_t)lroundf(mapped);
+    if (!sendOSCInt32Value(address, value)) return false;
+    showOscFeedback(name, address, String(value));
+    return true;
+  }
+  if (d.enc.outputType == TYPE_STRING) {
+    const String value = amountStringValue(mapped);
+    if (!sendOSCValue(address, TYPE_STRING, 0, value)) return false;
+    showOscFeedback(name, address, value);
+    return true;
+  }
+  if (!sendOSCValue(address, TYPE_FLOAT, mapped)) return false;
+  showOscFeedback(name, address, String(mapped, 3));
+  return true;
+}
+
+static bool sendV2DirectionValue(const ChainDevice& d, int16_t delta) {
+  if (delta == 0) return false;
+  const String& address = d.enc.rotAddr;
+  const String& value = delta > 0 ? d.enc.clockwiseValue
+                                  : d.enc.counterClockwiseValue;
+  bool sent = false;
+  if (d.enc.outputType == TYPE_INT) {
+    sent = sendOSCInt32Value(address, (int32_t)strtol(value.c_str(), nullptr, 10));
+  } else if (d.enc.outputType == TYPE_FLOAT) {
+    sent = sendOSCValue(address, TYPE_FLOAT, value.toFloat());
+  } else {
+    sent = sendOSCValue(address, TYPE_STRING, 0, value);
+  }
+  if (sent) showOscFeedback(deviceDisplayName(d), address, value);
+  return sent;
+}
+
+static void applyV2EncoderDelta(EncoderV2RuntimeState& state, ChainDevice& d,
+                                int16_t delta) {
+  if (d.enc.rotationMode < ENCODER_ROTATION_AMOUNT ||
+      d.enc.rotationMode > ENCODER_ROTATION_DIRECTION) return;
+  if (d.enc.rotationMode == ENCODER_ROTATION_AMOUNT &&
+      (d.enc.rangeSteps < 1 || !isfinite(d.enc.outputMin) ||
+       !isfinite(d.enc.outputMax) || !(d.enc.outputMin < d.enc.outputMax)))
+    return;
+  observeV2Semantics(state, d);
+  if (delta == 0) return;
+
+  if (d.enc.rotationMode == ENCODER_ROTATION_DIRECTION) {
+    sendV2DirectionValue(d, delta);
+    return;
+  }
+
+  // D3 validation guarantees rangeSteps >= 1 and finite ordered outputs.
+  const int32_t rangeSteps = d.enc.rangeSteps;
+  const int32_t amountDelta = d.enc.clockwiseIncreases
+                                  ? (int32_t)delta
+                                  : -(int32_t)delta;
+  int64_t next = (int64_t)state.logicalPosition + amountDelta;
+  if (d.enc.wrapAround) {
+    const int64_t positionCount = (int64_t)rangeSteps + 1;
+    next %= positionCount;
+    if (next < 0) next += positionCount;
+  } else {
+    if (next < 0) next = 0;
+    if (next > rangeSteps) next = rangeSteps;
+  }
+  state.logicalPosition = (int32_t)next;
+
+  const float ratio = (float)state.logicalPosition / (float)rangeSteps;
+  const float mapped = d.enc.outputMin +
+                       ratio * (d.enc.outputMax - d.enc.outputMin);
+  // A nonzero input always sends, including an outward step at a Stop endpoint.
+  sendV2AmountValue(d, mapped);
+}
+
+static void pollV2EncoderRotation(ChainDevice& d) {
+  EncoderV2RuntimeState& state = encoderV2RuntimeFor(d);
+  int16_t delta = 0;
+  const chain_status_t status = M5Chain.getEncoderIncValue(d.chainId, &delta);
+  if (status != CHAIN_OK) {
+    // A failed response may have consumed the device-side clear-on-read value.
+    // CHAIN_BUSY means no command was sent; all other failures are uncertain.
+    if (status != CHAIN_BUSY) state.inputContinuityValid = false;
+    return;
+  }
+  if (!state.inputContinuityValid) {
+    state.inputContinuityValid = true;
+    observeV2Semantics(state, d);
+    return;  // Recovery sample is discarded regardless of its value.
+  }
+  applyV2EncoderDelta(state, d, delta);
+}
+
+void pollEncoder(ChainDevice& d) {
+  if (d.enc.settingsModel == ENCODER_SETTINGS_V2)
+    pollV2EncoderRotation(d);
+  else
+    pollLegacyEncoderRotation(d);
 
   uint8_t st = 0;
   if (M5Chain.getEncoderButtonStatus(d.chainId, &st) == CHAIN_OK && st != d.lastButtonStatus) {
-    if (d.enc.clickMode == MODE_SEQUENCE) {
+    const KeyMode pushMode = d.enc.settingsModel == ENCODER_SETTINGS_V2
+                                 ? d.enc.pushMode
+                                 : d.enc.clickMode;
+    if (pushMode == MODE_SEQUENCE) {
       if (st == 1) {
         setOperationalLed(d, color_green);
         handleSequencePress(d.enc.clickSeq, deviceDisplayName(d));
@@ -307,6 +555,7 @@ bool refreshChainDevices(bool force) {
 
   if (!M5Chain.isDeviceConnected()) {
     if (deviceCount != 0 || lastKnownDeviceCount != 0) {
+      disconnectAllEncoderV2CacheEntries();
       deviceCount = 0;
       lastKnownDeviceCount = 0;
       lastDeviceFingerprint = "";
@@ -361,6 +610,10 @@ bool refreshChainDevices(bool force) {
   bool changed = (fp != lastDeviceFingerprint) || force;
 
   if (changed) {
+    // ChainDevice objects are about to be rebuilt. Preserve semantic state in
+    // the UID cache, but require every rediscovered V2 Encoder to re-establish
+    // its non-idempotent IncValue input continuity.
+    disconnectAllEncoderV2CacheEntries();
     // Enumeration runs periodically for hot-swap detection. Read persistent
     // settings only after the topology fingerprint changes; otherwise every
     // scan would reopen every LittleFS device file.
@@ -379,6 +632,13 @@ bool refreshChainDevices(bool force) {
     lastDeviceFingerprint = fp;
     for (int i = 0; i < MAX_DEVICES; i++) devices[i] = ChainDevice();
     for (int i = 0; i < tmpCount; i++) devices[i] = tmp[i];
+
+    // Protect every rediscovered cache entry before allocating any new one so
+    // device-list ordering cannot evict an Encoder that is still connected.
+    for (int i = 0; i < deviceCount; ++i)
+      protectExistingV2EncoderAfterRebuild(devices[i]);
+    for (int i = 0; i < deviceCount; ++i)
+      bindV2EncoderAfterRebuild(devices[i]);
 
     for (int i = 0; i < deviceCount; i++) {
       if (!devices[i].active) continue;

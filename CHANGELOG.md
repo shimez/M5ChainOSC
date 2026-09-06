@@ -6,6 +6,21 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-07
+
+### Added
+
+- Chain EncoderのDevice Preset v2に対応し、回転量／回転方向モードとV2プッシュ設定を追加
+- Device Preset v1のインポート互換性とLegacy Encoder設定の維持に対応
+- ユーザーの明示操作によるLegacy Encoder設定からV2設定への移行機能を追加
+- UID単位でEncoderのruntime位置を維持する仕組みを追加
+- Device Preset v2 Encoderのインポート／エクスポート検証と適合性確認に対応
+
+### Changed
+
+- Encoder Web UIをDevice Preset v2設定とLegacy設定の双方を明確に扱える構成へ更新
+- Encoder設定の永続化を、保存成功後にのみruntimeへ反映するtransactionalな処理へ改善
+
 ## [1.11.3] - 2026-09-04
 
 ### Added

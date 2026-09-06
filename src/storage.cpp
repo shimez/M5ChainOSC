@@ -4,6 +4,10 @@
 #include "device_file_storage.h"
 #include "system_settings.h"
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
 
 #if M5CHAINOSC_STORAGE_DEBUG
 #define STORAGE_LOG(...) do { Serial.print("[M5OSC][NVS] "); Serial.printf(__VA_ARGS__); Serial.println(); } while (0)
@@ -107,6 +111,16 @@ void setDefaultDeviceMessages(ChainDevice& d) {
                              0, 10, 1, 0);
 
   d.enc.rotAddr       = "/avatar/parameters/Encoder";
+  d.enc.settingsModel = ENCODER_SETTINGS_LEGACY;
+  d.enc.rotationMode  = ENCODER_ROTATION_AMOUNT;
+  d.enc.rangeSteps    = 20;
+  d.enc.clockwiseIncreases = true;
+  d.enc.outputMin     = 0;
+  d.enc.outputMax     = 1;
+  d.enc.outputType    = TYPE_FLOAT;
+  d.enc.clockwiseValue = "0.05";
+  d.enc.counterClockwiseValue = "-0.05";
+  d.enc.pushMode      = MODE_PRESS_RELEASE;
   d.enc.sendIncrement = false;
   d.enc.absInMin      = 0;
   d.enc.absInMax      = 20;
@@ -174,6 +188,11 @@ static void appendField(String& out, const String& v) {
 }
 static void appendField(String& out, int v) { appendField(out, String(v)); }
 static void appendField(String& out, float v) { appendField(out, String(v, 6)); }
+static void appendFloat32Field(String& out, float v) {
+  char buffer[24];
+  snprintf(buffer, sizeof(buffer), "%.9g", (double)v);
+  appendField(out, String(buffer));
+}
 
 static String nextField(const String& src, int& idx) {
   if (idx >= (int)src.length()) return "";
@@ -308,13 +327,129 @@ static bool readMessageList(const String& blob, int& pos, OSCMessage* press,
   return true;
 }
 
+static bool validValueType(int value) {
+  return value >= TYPE_FLOAT && value <= TYPE_STRING;
+}
+
+static bool parseInt32Strict(const String& text, int32_t& value) {
+  if (!text.length()) return false;
+  errno = 0;
+  char* end = nullptr;
+  const long parsed = strtol(text.c_str(), &end, 10);
+  if (errno == ERANGE || end == text.c_str() || *end != '\0' ||
+      parsed < INT32_MIN || parsed > INT32_MAX) return false;
+  value = (int32_t)parsed;
+  return true;
+}
+
+static bool parseFloat32Strict(const String& text, float& value) {
+  if (!text.length()) return false;
+  errno = 0;
+  char* end = nullptr;
+  const float parsed = strtof(text.c_str(), &end);
+  if (errno == ERANGE || end == text.c_str() || *end != '\0' ||
+      !isfinite(parsed)) return false;
+  value = parsed;
+  return true;
+}
+
+static bool amountOutputIsValid(float outputMin, float outputMax,
+                                ValueType outputType) {
+  if (!isfinite(outputMin) || !isfinite(outputMax) ||
+      !(outputMin < outputMax) || !isfinite(outputMax - outputMin) ||
+      !validValueType((int)outputType)) return false;
+  if (outputType != TYPE_INT) return true;
+
+  // The mapping is monotonic, so validating the rounded endpoints is
+  // sufficient to cover every logical position between them.
+  const double roundedMin = round((double)outputMin);
+  const double roundedMax = round((double)outputMax);
+  return roundedMin >= INT32_MIN && roundedMin <= INT32_MAX &&
+         roundedMax >= INT32_MIN && roundedMax <= INT32_MAX;
+}
+
+static bool directionValuesAreValid(const EncoderOscConfig& encoder) {
+  if (encoder.clockwiseValue.length() > MAX_OSC_VALUE_BYTES ||
+      encoder.counterClockwiseValue.length() > MAX_OSC_VALUE_BYTES)
+    return false;
+  if (encoder.outputType == TYPE_STRING) return true;
+  if (encoder.outputType == TYPE_INT) {
+    int32_t clockwise = 0;
+    int32_t counterClockwise = 0;
+    return parseInt32Strict(encoder.clockwiseValue, clockwise) &&
+           parseInt32Strict(encoder.counterClockwiseValue, counterClockwise);
+  }
+  float clockwise = 0;
+  float counterClockwise = 0;
+  return parseFloat32Strict(encoder.clockwiseValue, clockwise) &&
+         parseFloat32Strict(encoder.counterClockwiseValue, counterClockwise);
+}
+
+bool encoderV2SettingsAreValid(const EncoderOscConfig& encoder) {
+  if (encoder.rotationMode < ENCODER_ROTATION_AMOUNT ||
+      encoder.rotationMode > ENCODER_ROTATION_DIRECTION ||
+      encoder.rangeSteps < 1 || !validValueType((int)encoder.outputType) ||
+      encoder.pushMode < MODE_PRESS_RELEASE || encoder.pushMode > MODE_SEQUENCE ||
+      !isfinite(encoder.outputMin) || !isfinite(encoder.outputMax) ||
+      encoder.clockwiseValue.length() > MAX_OSC_VALUE_BYTES ||
+      encoder.counterClockwiseValue.length() > MAX_OSC_VALUE_BYTES)
+    return false;
+  return encoder.rotationMode == ENCODER_ROTATION_AMOUNT
+             ? amountOutputIsValid(encoder.outputMin, encoder.outputMax,
+                                   encoder.outputType)
+             : directionValuesAreValid(encoder);
+}
+
+static bool convertLegacyEncoderCandidateToV2(EncoderOscConfig& encoder) {
+  if (!validValueType((int)encoder.map.outType) ||
+      !isfinite(encoder.incScale) ||
+      !isfinite(encoder.map.outMin) || !isfinite(encoder.map.outMax))
+    return false;
+
+  encoder.outputType = encoder.map.outType;
+  encoder.pushMode = encoder.clickMode;
+
+  // The released Increment runtime multiplies by |delta| and clamps the
+  // result. V2 Direction sends one fixed value regardless of |delta|, so an
+  // Increment configuration cannot be migrated losslessly and must stay on
+  // the product-internal Legacy path.
+  if (encoder.sendIncrement) {
+    return false;
+  }
+
+  const float span = encoder.absInMax - encoder.absInMin;
+  if (!isfinite(encoder.absInMin) || !isfinite(encoder.absInMax) ||
+      !isfinite(span) || floorf(span) != span || span < 1 || span > 65535 ||
+      encoder.absInMin != 0.0f || encoder.wrapAround ||
+      !amountOutputIsValid(encoder.map.outMin, encoder.map.outMax,
+                           encoder.map.outType)) return false;
+
+  encoder.rotationMode = ENCODER_ROTATION_AMOUNT;
+  encoder.rangeSteps = (uint16_t)span;
+  encoder.clockwiseIncreases = true;
+  encoder.outputMin = encoder.map.outMin;
+  encoder.outputMax = encoder.map.outMax;
+  encoder.settingsModel = ENCODER_SETTINGS_V2;
+  return true;
+}
+
+bool buildEncoderV2MigrationCandidate(const EncoderOscConfig& legacy,
+                                      EncoderOscConfig& candidate) {
+  if (legacy.settingsModel != ENCODER_SETTINGS_LEGACY) return false;
+  candidate = legacy;
+  return convertLegacyEncoderCandidateToV2(candidate);
+}
+
 // D1 stores only fields used by the actual device type. This avoids the old
 // all-device blob, where every Key also consumed space for Encoder, Angle,
 // Joystick and ToF defaults.
 static String serializeTypedDeviceConfig(const ChainDevice& d) {
   String out;
   out.reserve(256);
-  appendField(out, String("D2")); appendField(out, d.uid);
+  const bool encoderV2 = d.type == CHAIN_ENCODER_TYPE_CODE &&
+                         d.enc.settingsModel == ENCODER_SETTINGS_V2;
+  if (encoderV2 && !encoderV2SettingsAreValid(d.enc)) return "";
+  appendField(out, String(encoderV2 ? "D3" : "D2")); appendField(out, d.uid);
   appendField(out, (int)d.type); appendField(out, d.displayName);
   if (d.type == CHAIN_KEY_TYPE_CODE) {
     appendField(out, (int)d.mode); appendField(out, d.seq.address);
@@ -322,11 +457,23 @@ static String serializeTypedDeviceConfig(const ChainDevice& d) {
     appendField(out, d.seq.end); appendField(out, d.seq.step);
     appendMessageList(out, d.pressMessages, d.pressMessageCount, d.releaseMessages, d.releaseMessageCount);
   } else if (d.type == CHAIN_ENCODER_TYPE_CODE) {
-    appendField(out, d.enc.rotAddr); appendField(out, d.enc.sendIncrement ? 1 : 0);
-    appendField(out, d.enc.wrapAround ? 1 : 0);
-    appendField(out, d.enc.absInMin); appendField(out, d.enc.absInMax); appendField(out, d.enc.incScale);
-    appendField(out, d.enc.map.outMin); appendField(out, d.enc.map.outMax); appendField(out, (int)d.enc.map.outType);
-    appendField(out, (int)d.enc.clickMode); appendField(out, d.enc.clickSeq.address);
+    if (encoderV2) {
+      appendField(out, d.enc.rotAddr); appendField(out, (int)d.enc.rotationMode);
+      appendField(out, (int)d.enc.rangeSteps); appendField(out, d.enc.wrapAround ? 1 : 0);
+      appendField(out, d.enc.clockwiseIncreases ? 1 : 0);
+      appendFloat32Field(out, d.enc.outputMin);
+      appendFloat32Field(out, d.enc.outputMax);
+      appendField(out, (int)d.enc.outputType);
+      appendField(out, d.enc.clockwiseValue); appendField(out, d.enc.counterClockwiseValue);
+      appendField(out, (int)d.enc.pushMode);
+    } else {
+      appendField(out, d.enc.rotAddr); appendField(out, d.enc.sendIncrement ? 1 : 0);
+      appendField(out, d.enc.wrapAround ? 1 : 0);
+      appendField(out, d.enc.absInMin); appendField(out, d.enc.absInMax); appendField(out, d.enc.incScale);
+      appendField(out, d.enc.map.outMin); appendField(out, d.enc.map.outMax); appendField(out, (int)d.enc.map.outType);
+      appendField(out, (int)d.enc.clickMode);
+    }
+    appendField(out, d.enc.clickSeq.address);
     appendField(out, (int)d.enc.clickSeq.valueType); appendField(out, d.enc.clickSeq.start);
     appendField(out, d.enc.clickSeq.end); appendField(out, d.enc.clickSeq.step);
     appendMessageList(out, d.enc.pressMessages, d.enc.pressMessageCount, d.enc.releaseMessages, d.enc.releaseMessageCount);
@@ -357,8 +504,10 @@ static bool applyTypedDeviceConfig(ChainDevice& d, const String& blob) {
   int pos = 0;
   auto field = [&]() { return nextField(blob, pos); };
   const String format = field();
-  if ((format != "D1" && format != "D2") || field() != d.uid) return false;
+  if ((format != "D1" && format != "D2" && format != "D3") ||
+      field() != d.uid) return false;
   chain_device_type_t storedType = (chain_device_type_t)field().toInt();
+  if (format == "D3" && storedType != CHAIN_ENCODER_TYPE_CODE) return false;
   if (storedType != d.type && d.type != CHAIN_UNKNOWN_TYPE_CODE) return false;
   candidate.type = storedType; candidate.displayName = field();
   if (candidate.displayName.length() > MAX_DEVICE_NAME_BYTES) return false;
@@ -374,13 +523,74 @@ static bool applyTypedDeviceConfig(ChainDevice& d, const String& blob) {
     if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
     normalizeSequence(candidate.seq);
   } else if (storedType == CHAIN_ENCODER_TYPE_CODE) {
-    candidate.enc.rotAddr = field(); candidate.enc.sendIncrement = field().toInt() != 0;
-    candidate.enc.wrapAround = format == "D2" ? field().toInt() != 0 : true;
-    candidate.enc.absInMin = field().toFloat(); candidate.enc.absInMax = field().toFloat(); candidate.enc.incScale = field().toFloat();
-    candidate.enc.map.outMin = field().toFloat(); candidate.enc.map.outMax = field().toFloat();
-    int encoderOutputType = field().toInt();
-    candidate.enc.map.outType = (ValueType)constrain(encoderOutputType, 0, 2);
-    candidate.enc.clickMode = field().toInt() == MODE_SEQUENCE ? MODE_SEQUENCE : MODE_PRESS_RELEASE;
+    candidate.enc.rotAddr = field();
+    if (format == "D3") {
+      int32_t rotationMode = 0;
+      int32_t rangeSteps = 0;
+      int32_t wrap = 0;
+      int32_t clockwiseIncreases = 0;
+      int32_t encoderOutputType = 0;
+      int32_t pushMode = 0;
+      float outputMin = 0;
+      float outputMax = 0;
+      if (!parseInt32Strict(field(), rotationMode) ||
+          !parseInt32Strict(field(), rangeSteps) ||
+          !parseInt32Strict(field(), wrap) ||
+          !parseInt32Strict(field(), clockwiseIncreases) ||
+          !parseFloat32Strict(field(), outputMin) ||
+          !parseFloat32Strict(field(), outputMax) ||
+          !parseInt32Strict(field(), encoderOutputType)) return false;
+      candidate.enc.wrapAround = wrap != 0;
+      candidate.enc.clockwiseIncreases = clockwiseIncreases != 0;
+      candidate.enc.outputMin = outputMin;
+      candidate.enc.outputMax = outputMax;
+      candidate.enc.clockwiseValue = field();
+      candidate.enc.counterClockwiseValue = field();
+      if (!parseInt32Strict(field(), pushMode)) return false;
+      if (rotationMode < ENCODER_ROTATION_AMOUNT ||
+          rotationMode > ENCODER_ROTATION_DIRECTION || rangeSteps < 1 ||
+          rangeSteps > 65535 || (wrap != 0 && wrap != 1) ||
+          (clockwiseIncreases != 0 && clockwiseIncreases != 1) ||
+          !validValueType(encoderOutputType) ||
+          pushMode < MODE_PRESS_RELEASE || pushMode > MODE_SEQUENCE ||
+          !isfinite(candidate.enc.outputMin) ||
+          !isfinite(candidate.enc.outputMax) ||
+          (rotationMode == ENCODER_ROTATION_AMOUNT &&
+           !amountOutputIsValid(candidate.enc.outputMin,
+                                candidate.enc.outputMax,
+                                (ValueType)encoderOutputType)))
+        return false;
+      candidate.enc.settingsModel = ENCODER_SETTINGS_V2;
+      candidate.enc.rotationMode = (EncoderRotationMode)rotationMode;
+      candidate.enc.rangeSteps = (uint16_t)rangeSteps;
+      candidate.enc.outputType = (ValueType)encoderOutputType;
+      candidate.enc.pushMode = (KeyMode)pushMode;
+      if (candidate.enc.rotationMode == ENCODER_ROTATION_DIRECTION &&
+          !directionValuesAreValid(candidate.enc)) return false;
+
+      // Phase 1 compatibility bridge: keep the released runtime operational
+      // until Phase 2 consumes the v2 semantic fields directly.
+      candidate.enc.sendIncrement = rotationMode == ENCODER_ROTATION_DIRECTION;
+      candidate.enc.absInMin = 0;
+      candidate.enc.absInMax = candidate.enc.rangeSteps;
+      candidate.enc.incScale = candidate.enc.clockwiseValue.toFloat();
+      candidate.enc.map.outMin = candidate.enc.outputMin;
+      candidate.enc.map.outMax = candidate.enc.outputMax;
+      candidate.enc.map.outType = candidate.enc.outputType;
+      candidate.enc.clickMode = candidate.enc.pushMode;
+    } else {
+      candidate.enc.sendIncrement = field().toInt() != 0;
+      candidate.enc.wrapAround = format == "D2" ? field().toInt() != 0 : true;
+      candidate.enc.absInMin = field().toFloat(); candidate.enc.absInMax = field().toFloat(); candidate.enc.incScale = field().toFloat();
+      candidate.enc.map.outMin = field().toFloat(); candidate.enc.map.outMax = field().toFloat();
+      int encoderOutputType = field().toInt();
+      candidate.enc.map.outType = (ValueType)constrain(encoderOutputType, 0, 2);
+      candidate.enc.clickMode = field().toInt() == MODE_SEQUENCE ? MODE_SEQUENCE : MODE_PRESS_RELEASE;
+      // D1/D2 are published product-internal Legacy formats. Even when their
+      // values can be represented by v2, observable runtime semantics (for
+      // example Wrap endpoints) differ, so load must never promote them.
+      candidate.enc.settingsModel = ENCODER_SETTINGS_LEGACY;
+    }
     candidate.enc.clickSeq.address = field();
     int encoderSequenceType = field().toInt();
     candidate.enc.clickSeq.valueType = encoderSequenceType >= TYPE_FLOAT && encoderSequenceType <= TYPE_STRING ? (ValueType)encoderSequenceType : TYPE_FLOAT;

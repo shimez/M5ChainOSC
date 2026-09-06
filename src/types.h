@@ -28,10 +28,39 @@ struct RangeMap {
   ValueType outType = TYPE_FLOAT;
 };
 
+enum EncoderSettingsModel : uint8_t {
+  ENCODER_SETTINGS_LEGACY = 0,
+  ENCODER_SETTINGS_V2     = 1
+};
+
+enum EncoderRotationMode : uint8_t {
+  ENCODER_ROTATION_AMOUNT    = 0,
+  ENCODER_ROTATION_DIRECTION = 1
+};
+
 // ---------------------------------------------------------------------------
 // Per-device OSC config
 // ---------------------------------------------------------------------------
 struct EncoderOscConfig {
+  // Persistent Encoder model. D1/D2 settings that cannot be represented by
+  // Device Preset v2 remain LEGACY without correction or implicit migration.
+  EncoderSettingsModel settingsModel = ENCODER_SETTINGS_LEGACY;
+
+  // D3 / Device Preset v2 semantic settings. Runtime-only state such as the
+  // logical position and input baseline deliberately does not live here.
+  EncoderRotationMode rotationMode = ENCODER_ROTATION_AMOUNT;
+  uint16_t       rangeSteps = 20;
+  bool           clockwiseIncreases = true;
+  float          outputMin = 0;
+  float          outputMax = 1;
+  ValueType      outputType = TYPE_FLOAT;
+  String         clockwiseValue = "0.05";
+  String         counterClockwiseValue = "-0.05";
+  KeyMode        pushMode = MODE_PRESS_RELEASE;
+
+  // Phase 1 compatibility bridge for the released D1/D2 model and current
+  // runtime/Web UI. Phase 2 will stop using these fields for v2 semantics;
+  // they must remain available for the product-internal Legacy path.
   String         rotAddr       = "/avatar/parameters/Encoder";
   bool           sendIncrement = false;
   bool           wrapAround    = true;
@@ -81,6 +110,23 @@ struct TofOscConfig {
   RangeMap map;                   // in: 30–maxDistanceMm → out: configurable
 };
 
+// Volatile Device Preset v2 Encoder state. The authoritative instance lives
+// in the UID cache; ChainDevice owns one only as a safe non-persistent fallback
+// when a verified 12-byte UID is unavailable or the bounded cache is full.
+struct EncoderV2RuntimeState {
+  int32_t logicalPosition = 0;
+  bool semanticsObserved = false;
+  EncoderRotationMode observedMode = ENCODER_ROTATION_AMOUNT;
+  bool amountSnapshotValid = false;
+  uint16_t rangeSteps = 0;
+  bool wrap = false;
+  bool clockwiseIncreases = true;
+  float outputMin = 0;
+  float outputMax = 0;
+  ValueType outputType = TYPE_FLOAT;
+  bool inputContinuityValid = false;
+};
+
 // ---------------------------------------------------------------------------
 // Live Chain device slot
 // ---------------------------------------------------------------------------
@@ -112,6 +158,9 @@ struct ChainDevice {
   bool    encInited        = false;
   float   boundedEncAbs    = 0;
   bool    boundedEncInited = false;
+
+  EncoderV2RuntimeState encV2FallbackRuntime;
+
   int     lastAngle        = -99999;
   int16_t lastJoyX         = 0;
   int16_t lastJoyY         = 0;

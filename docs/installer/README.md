@@ -13,8 +13,9 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 デスクトップ版のChromeまたはEdgeを使用してください。
 
-現在の正式版は`1.11.3`です。
+現在の正式版は`1.12.0`です。
 
+- Version 1.12.0: Chain EncoderのDevice Preset v2、Legacy設定の維持と明示的なV2移行、UID単位のruntime continuityに対応
 - Version 1.11.3: Web UIの入力検証を強化し、通常画面とAP Modeへfaviconを追加
 - Version 1.11.1: AP Modeのキャプティブポータルからの全設定削除に対応し、mDNSホスト名を`m5chainosc.local`へ変更
 - Version 1.11.0: Web UIから全設定を削除して再起動する機能を追加
@@ -39,10 +40,10 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 ## ファームウェアの配置
 
-Web Installerには、GitHub ActionsでビルドしてGitHub Releaseへ添付したmergedバイナリを、Pages配信Workflowが自動的に組み込みます。Version 1.11.3では次のパスで配信します。
+Web Installerには、GitHub ActionsでビルドしてGitHub Releaseへ添付したmergedバイナリを、Pages配信Workflowが自動的に組み込みます。Version 1.12.0では次のパスで配信します。
 
 ```text
-installer/firmware/M5ChainOSC-1.11.3-AtomS3R-merged.bin
+installer/firmware/M5ChainOSC-1.12.0-AtomS3R-merged.bin
 ```
 
 `manifest.json`は、この同一オリジンのファイルをESP32-S3のoffset `0x0`へ書き込みます。GitHub Release AssetのURLはブラウザのCORS制限で取得できない場合があるため、ブラウザから直接参照せず、GitHub ActionsがPages成果物へコピーします。
