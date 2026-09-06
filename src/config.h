@@ -25,7 +25,10 @@ static const size_t MAX_DEVICE_NAME_BYTES = 64;
 static const size_t MAX_DEVICE_CONFIG_BYTES = 3800;
 static const uint16_t SETTINGS_SCHEMA_VERSION = 2;
 static const char* SETTINGS_FORMAT_NAME = "M5ChainOSC-settings";
+// The Phase 4A exporter remains v1. Import accepts both published v1 and the
+// current Encoder v2 format through explicit schema-specific paths.
 static const uint16_t DEVICE_PRESET_SCHEMA_VERSION = 1;
+static const uint16_t DEVICE_PRESET_SCHEMA_VERSION_V2 = 2;
 static const char* DEVICE_PRESET_FORMAT_NAME = "ChainOSC-device-preset";
 static const char* LEGACY_DEVICE_PRESET_FORMAT_NAME = "M5ChainOSC-device-preset";
 

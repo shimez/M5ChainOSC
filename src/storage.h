@@ -18,6 +18,7 @@ void applySerializedConfig(ChainDevice& d, const String& blob);
 // Loading or normally saving a Legacy D1/D2 setting never calls this helper.
 bool buildEncoderV2MigrationCandidate(const EncoderOscConfig& legacy,
                                       EncoderOscConfig& candidate);
+bool encoderV2SettingsAreValid(const EncoderOscConfig& encoder);
 
 // Per-device load / save / delete
 String loadDeviceNameOnly(const String& uid);

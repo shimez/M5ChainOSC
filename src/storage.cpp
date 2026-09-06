@@ -385,7 +385,7 @@ static bool directionValuesAreValid(const EncoderOscConfig& encoder) {
          parseFloat32Strict(encoder.counterClockwiseValue, counterClockwise);
 }
 
-static bool encoderV2SettingsAreValid(const EncoderOscConfig& encoder) {
+bool encoderV2SettingsAreValid(const EncoderOscConfig& encoder) {
   if (encoder.rotationMode < ENCODER_ROTATION_AMOUNT ||
       encoder.rotationMode > ENCODER_ROTATION_DIRECTION ||
       encoder.rangeSteps < 1 || !validValueType((int)encoder.outputType) ||
@@ -420,7 +420,7 @@ static bool convertLegacyEncoderCandidateToV2(EncoderOscConfig& encoder) {
   const float span = encoder.absInMax - encoder.absInMin;
   if (!isfinite(encoder.absInMin) || !isfinite(encoder.absInMax) ||
       !isfinite(span) || floorf(span) != span || span < 1 || span > 65535 ||
-      encoder.absInMin != 0.0f ||
+      encoder.absInMin != 0.0f || encoder.wrapAround ||
       !amountOutputIsValid(encoder.map.outMin, encoder.map.outMax,
                            encoder.map.outType)) return false;
 
