@@ -15,6 +15,8 @@
 #include <ArduinoJson.h>
 #include <esp_heap_caps.h>
 
+#define TEST_FORCE_ENCODER_SAVE_FAILURE 0
+
 static const char M5CHAINOSC_FAVICON_LINK[] PROGMEM =
     "<link rel='icon' type='image/svg+xml' href='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPjxzdG9wIHN0b3AtY29sb3I9IiMyOTIyNGYiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwOTBkMTgiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz4KICA8cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0idXJsKCNiZykiLz4KICA8ZyBmaWxsPSJub25lIiBzdHJva2U9IiM5Njc0ZmYiIHN0cm9rZS13aWR0aD0iNS41Ij48cmVjdCB4PSI5IiB5PSIyMiIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiByeD0iOC41IiB0cmFuc2Zvcm09InJvdGF0ZSgtMTggMjIuNSAzMC41KSIvPjxyZWN0IHg9IjI4IiB5PSIyMiIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiByeD0iOC41IiB0cmFuc2Zvcm09InJvdGF0ZSgxOCA0MS41IDMwLjUpIi8+PC9nPgo8L3N2Zz4K'>";
 
@@ -195,6 +197,21 @@ static String clickModeHtml(const String& name, KeyMode cur, const String& prId,
   return s;
 }
 
+static String pushModeHtml(const String& name, KeyMode cur, const String& prId,
+                           const String& sqId) {
+  String s = "<div class='mode-box'><label>" +
+             String(tr("Push Mode", "プッシュモード")) + "</label>";
+  s += "<select name='" + name + "' onchange=\"toggleClickMode('" + prId +
+       "','" + sqId + "',this)\">";
+  s += "<option value='0'" +
+       String(cur == MODE_PRESS_RELEASE ? " selected" : "") + ">" +
+       String(tr("Press / Release", "押した時／離した時")) + "</option>";
+  s += "<option value='1'" +
+       String(cur == MODE_SEQUENCE ? " selected" : "") + ">" +
+       String(tr("Sequence", "シーケンス")) + "</option></select></div>";
+  return s;
+}
+
 static String messageRowHtml(const String& group, const String& prefix, const char* eventName, int order, const OSCMessage& m) {
   String idx = group.substring(prefix.length());
   String p = prefix + (String(eventName) == "press" ? "p" : "r");
@@ -228,6 +245,17 @@ static String finiteFloatInputHtml(const String& label, const String& name,
          "</label><input class='finite-float' type='number' step='any' name='" +
          name + "' value='" + String(value) +
          "' oninput='validateNumericInput(this)'><small class='numeric-error err'></small></div>";
+}
+
+static String finiteFloat32InputHtml(const String& label, const String& name,
+                                     float value,
+                                     const String& extraClass = "") {
+  String classes = "numeric-field";
+  if (extraClass.length()) classes += " " + extraClass;
+  return "<div class='" + classes + "'><label>" + label +
+         "</label><input class='finite-float' type='number' step='any' name='" +
+         name + "' value='" + String(value, 9) +
+         "' oninput='validateNumericInput(this);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
 }
 
 static String boundedIntegerInputHtml(const String& label, const String& name,
@@ -1143,7 +1171,7 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .release{border-left:5px solid #007bff;padding-left:10px;margin-top:12px}
 .seq{border-left:5px solid #20c997;padding-left:10px;margin-top:12px}
 .click-sequence{padding:10px;margin-top:12px}
-.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{visibility:hidden;pointer-events:none}.wrap-setting{display:flex;align-items:center;gap:6px}.wrap-setting input{width:auto;margin:0}
+.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{display:none}.wrap-setting{display:flex;align-items:center;gap:6px}.wrap-setting input{width:auto;margin:0}.encoder-model{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;background:#fff3cd;color:#795700;font-size:.75em;font-weight:normal}.encoder-model-v2{background:#dff3e5;color:#216e39}.encoder-v2-mode{grid-column:1/-1}.encoder-v2-mode-fields{display:contents}.encoder-v2-direction-value input{font-family:inherit}.encoder-v2-amount-active .encoder-v2-type{order:1}.encoder-v2-amount-active .encoder-v2-increase-direction{order:2}
 .ang{border-left:5px solid #6610f2;padding-left:10px;margin-top:12px}.angle-grid,.tof-grid,.joystick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.angle-grid label,.tof-grid label,.joystick-grid label{margin-top:0}.angle-address,.tof-address,.joystick-address,.joystick-invert{grid-column:1/-1}.joystick-invert{display:flex;gap:18px;flex-wrap:wrap}.joystick-invert label{display:flex;align-items:center;gap:6px;margin:0}.joystick-invert input{width:auto;margin:0}
 .joy{border-left:5px solid #e83e8c;padding-left:10px;margin-top:12px}
 .device{border-left:5px solid #6f42c1}
@@ -1164,7 +1192,8 @@ const JA=__JA__;const tx=(en,ja)=>JA?ja:en;const MAX_MSG=8;const enc=new TextEnc
 function bytes(v){return enc.encode(v).length}
 function toggleMode(pr,sq,sel){if(!pr||!sq)return;if(sel.value==='1'){pr.style.display='none';sq.style.display='block';}else{pr.style.display='block';sq.style.display='none';}}
 function toggleClickMode(prId,sqId,sel){toggleMode(document.getElementById(prId),document.getElementById(sqId),sel);}
-function updateEncoderMode(sel){let enc=sel.closest('.enc'),showAbsolute=sel.value==='0';if(!enc)return;enc.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.classList.toggle('encoder-mode-hidden',!showAbsolute))}
+function updateEncoderMode(sel){let card=sel.closest('.enc');if(!card)return;if(card.classList.contains('encoder-v2')){let amount=sel.value==='0';card.classList.toggle('encoder-v2-amount-active',amount);card.querySelectorAll('.encoder-v2-amount').forEach(x=>x.classList.toggle('encoder-mode-hidden',!amount));card.querySelectorAll('.encoder-v2-direction').forEach(x=>x.classList.toggle('encoder-mode-hidden',amount));return}let showAbsolute=sel.value==='0';card.querySelectorAll('.encoder-absolute-setting').forEach(x=>x.classList.toggle('encoder-mode-hidden',!showAbsolute))}
+function validateEncoderV2(card){if(!card||!card.classList.contains('encoder-v2'))return true;let ok=true,mode=card.querySelector('.encoder-v2-rotation-mode').value,type=card.querySelector('.encoder-v2-output-type').value;if(mode==='0'){let min=card.querySelector('.encoder-v2-output-min input'),max=card.querySelector('.encoder-v2-output-max input');if(!validateNumericInput(min))ok=false;if(!validateNumericInput(max))ok=false;let relation='';if(ok&&!(Number(min.value)<Number(max.value)))relation=tx('Minimum must be less than Maximum','最小値は最大値より小さくしてください');if(!sequenceFieldError(max,relation))ok=false;if(type==='1'&&!relation){for(let input of [min,max]){let rounded=Math.round(Math.abs(Number(input.value)))*Math.sign(Number(input.value));if(rounded<-2147483648||rounded>2147483647){sequenceFieldError(input,tx('Mapped Int values must fit in OSC int32','変換後のInt値はOSC int32の範囲内にしてください'));ok=false}}}}else{card.querySelectorAll('.encoder-v2-direction-value').forEach(field=>{let input=field.querySelector('input'),error='',value=input.value.trim();if(bytes(input.value)>128)error=tx('Keep the value within 128 bytes in UTF-8','値はUTF-8で128バイト以内にしてください');else if(type==='0'){let n=Number(value),f=Math.fround(n);if(!value||!Number.isFinite(n)||!Number.isFinite(f)||(n!==0&&f===0))error=tx('Enter a finite OSC float32 value','有限のOSC float32値を入力してください')}else if(type==='1'){if(!/^[+-]?\d+$/.test(value))error=tx('Enter a decimal OSC int32','OSC int32の10進整数を入力してください');else{let n=BigInt(value);if(n<-2147483648n||n>2147483647n)error=tx('Int must be between -2147483648 and 2147483647','Intは-2147483648～2147483647の範囲で入力してください')}}sequenceFieldError(input,error);if(error)ok=false})}return ok}
 function showEvent(group,event,btn){document.querySelectorAll('.event-panel[data-group="'+group+'"]').forEach(x=>x.style.display=x.dataset.event===event?'block':'none');btn.parentNode.querySelectorAll('.event-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function allRows(group){return document.querySelectorAll('.osc-row[data-group="'+group+'"]')}
 function renumber(group){let rows=allRows(group),prefix=rows.length?rows[0].dataset.prefix:document.querySelector('.add-msg[data-group="'+group+'"]').dataset.prefix,idx=group.substring(prefix.length);['press','release'].forEach(ev=>{document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="'+ev+'"]').forEach((r,i)=>{let p=prefix+(ev==='press'?'p':'r');r.querySelector('.msg-address').name=p+'a_'+idx+'_'+i;r.querySelector('.type').name=p+'t_'+idx+'_'+i;r.querySelector('.msg-value').name=p+'v_'+idx+'_'+i})});let n=rows.length;document.getElementById('count_'+group).textContent=n;document.getElementById('pc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="press"]').length;document.getElementById('rc_'+group).value=document.querySelectorAll('.osc-row[data-group="'+group+'"][data-event="release"]').length;document.querySelectorAll('.add-msg[data-group="'+group+'"]').forEach(b=>b.disabled=n>=MAX_MSG)}
@@ -1184,7 +1213,7 @@ function validateSequence(box){let fields=box.querySelectorAll('input[type=numbe
 document.addEventListener('input',event=>{let box=event.target.closest&&event.target.closest('.sequence-card');if(box&&event.target.matches('input[type=number]'))validateSequence(box)})
 function initializeMessageRows(){let groups=new Set();document.querySelectorAll('.osc-row').forEach(row=>{groups.add(row.dataset.group);validateInput(row.querySelector('.msg-address'));validateInput(row.querySelector('.msg-value'))});document.querySelectorAll('.add-msg[data-group]').forEach(button=>groups.add(button.dataset.group));groups.forEach(group=>renumber(group));document.querySelectorAll('.osc-address').forEach(validateInput)}
 function rememberScroll(){sessionStorage.setItem('m5osc-scroll',String(window.scrollY))}
-function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});document.querySelectorAll('.finite-float').forEach(i=>{if(!i.closest('.sequence-card')&&!validateNumericInput(i))ok=false});document.querySelectorAll('.bounded-integer').forEach(i=>{if(!validateIntegerInput(i))ok=false});document.querySelectorAll('.sequence-card').forEach(box=>{if(!validateSequence(box))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted OSC fields.','赤く表示されたOSC設定項目を修正してください。'))}return ok}
+function validateForm(){let ok=true;document.querySelectorAll('.msg-address,.msg-value,.osc-address').forEach(i=>{if(!validateInput(i))ok=false});document.querySelectorAll('.finite-float').forEach(i=>{if(!i.closest('.sequence-card')&&!i.closest('.encoder-v2')&&!validateNumericInput(i))ok=false});document.querySelectorAll('.bounded-integer').forEach(i=>{if(!validateIntegerInput(i))ok=false});document.querySelectorAll('.sequence-card').forEach(box=>{if(!validateSequence(box))ok=false});document.querySelectorAll('.encoder-v2').forEach(card=>{if(!validateEncoderV2(card))ok=false});if(!ok){let bad=document.querySelector('.invalid');if(bad)bad.focus();alert(tx('Please correct the highlighted settings fields.','赤く表示された設定項目を修正してください。'))}return ok}
 let toastTimer;function showToast(message,success){let toast=document.getElementById('save-toast');toast.textContent=message;toast.className='toast '+(success?'success':'error')+' show';clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),success?3000:6000)}
 async function saveSettings(event){event.preventDefault();if(!validateForm())return false;let form=event.currentTarget,button=form.querySelector('.save-bar button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));window.settingsSubmitting=true;button.disabled=true;button.textContent=tx('Saving...','保存中...');try{let response=await fetch('/save?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('Settings could not be saved.','設定を保存できませんでした。'));window.settingsDirty=false;let dirty=document.getElementById('dirty-status');if(dirty)dirty.hidden=true;showToast(message,true)}catch(error){showToast(error.message,false)}finally{window.settingsSubmitting=false;button.disabled=false;button.textContent=oldText}return false}
 async function deleteSavedDevice(event,form){event.preventDefault();if(!confirm(tx('Delete these settings?','この設定を削除しますか？')))return false;let button=form.querySelector('button'),oldText=button.textContent,params=new URLSearchParams();new FormData(form).forEach((value,key)=>params.append(key,value));button.disabled=true;button.textContent=tx('Deleting...','削除中...');try{let response=await fetch('/delete_device?ajax=1',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:params.toString()}),message=await response.text();if(!response.ok)throw new Error(message||tx('The saved device settings could not be deleted.','保存済みデバイス設定を削除できませんでした。'));let card=form.closest('.saved-device-card');if(card)card.remove();showToast(message,true)}catch(error){button.disabled=false;button.textContent=oldText;showToast(error.message,false)}return false}
@@ -1282,7 +1311,9 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     if (!devices[i].active) continue;
     String idx = String(i);
     bool isSeq = devices[i].mode == MODE_SEQUENCE;
-    bool encSeq = devices[i].enc.clickMode == MODE_SEQUENCE;
+    bool encSeq = (devices[i].enc.settingsModel == ENCODER_SETTINGS_V2
+                       ? devices[i].enc.pushMode
+                       : devices[i].enc.clickMode) == MODE_SEQUENCE;
     bool joySeq = devices[i].joy.clickMode == MODE_SEQUENCE;
     bool ph = isPlaceholderUid(devices[i].uid);
 
@@ -1325,24 +1356,44 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += finiteFloatInputHtml(tr("Step", "増減量"), "sp_" + idx, devices[i].seq.step);
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("st_" + idx, devices[i].seq.valueType) + "</div></div></div>";
     } else if (devices[i].type == CHAIN_ENCODER_TYPE_CODE) {
-      html += "<div class='enc'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong><div class='encoder-grid'>";
-      html += addressInputHtml(tr("Rotation Address", "回転OSCアドレス"),
+      const bool encoderV2 = devices[i].enc.settingsModel == ENCODER_SETTINGS_V2;
+      html += "<div class='enc" + String(encoderV2 ? " encoder-v2" : "") + String(encoderV2 && devices[i].enc.rotationMode == ENCODER_ROTATION_AMOUNT ? " encoder-v2-amount-active" : "") + "'><strong>" + String(tr("Encoder Rotation", "エンコーダー回転")) + "</strong>";
+      html += "<span class='encoder-model" + String(encoderV2 ? " encoder-model-v2" : "") + "'>" + String(encoderV2 ? tr("V2 settings", "V2設定") : tr("Legacy settings", "旧形式の設定")) + "</span><div class='encoder-grid'>";
+      html += addressInputHtml(encoderV2 ? tr("OSC Address", "OSCアドレス") : tr("Rotation Address", "回転OSCアドレス"),
                                "er_" + idx, devices[i].enc.rotAddr,
                                "encoder-address");
-      html += "<div><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
-      html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
-      const String absoluteHiddenClass = devices[i].enc.sendIncrement ? " encoder-mode-hidden" : "";
-      html += finiteFloatInputHtml(tr("Abs In Min", "絶対値入力の最小値"), "e0_" + idx, devices[i].enc.absInMin, "encoder-absolute-setting" + absoluteHiddenClass);
-      html += finiteFloatInputHtml(tr("Abs In Max", "絶対値入力の最大値"), "e1_" + idx, devices[i].enc.absInMax, "encoder-absolute-setting" + absoluteHiddenClass);
-      html += "<label class='encoder-absolute-setting wrap-setting" + absoluteHiddenClass + "'><input type='checkbox' name='ew_" + idx + "'" + String(devices[i].enc.wrapAround ? " checked" : "") + "> " + String(tr("Wrap around", "範囲をループする")) + "</label>";
-      html += finiteFloatInputHtml(tr("Inc Scale", "増分倍率"), "es_" + idx, devices[i].enc.incScale);
-      html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "eo_" + idx, devices[i].enc.map.outMin);
-      html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "eO_" + idx, devices[i].enc.map.outMax);
-      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div></div></div>";
-      html += "<div class='click-section encoder-click'>";
-      html += clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
+      if (!encoderV2) {
+        html += "<div><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
+        html += "<option value='1'" + String(devices[i].enc.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
+        const String absoluteHiddenClass = devices[i].enc.sendIncrement ? " encoder-mode-hidden" : "";
+        html += finiteFloatInputHtml(tr("Abs In Min", "絶対値入力の最小値"), "e0_" + idx, devices[i].enc.absInMin, "encoder-absolute-setting" + absoluteHiddenClass);
+        html += finiteFloatInputHtml(tr("Abs In Max", "絶対値入力の最大値"), "e1_" + idx, devices[i].enc.absInMax, "encoder-absolute-setting" + absoluteHiddenClass);
+        html += "<label class='encoder-absolute-setting wrap-setting" + absoluteHiddenClass + "'><input type='checkbox' name='ew_" + idx + "'" + String(devices[i].enc.wrapAround ? " checked" : "") + "> " + String(tr("Wrap around", "範囲をループする")) + "</label>";
+        html += finiteFloatInputHtml(tr("Inc Scale", "増分倍率"), "es_" + idx, devices[i].enc.incScale);
+        html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "eo_" + idx, devices[i].enc.map.outMin);
+        html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "eO_" + idx, devices[i].enc.map.outMax);
+        html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("et_" + idx, devices[i].enc.map.outType) + "</div>";
+      } else {
+        const bool amountMode = devices[i].enc.rotationMode == ENCODER_ROTATION_AMOUNT;
+        html += "<div class='encoder-v2-mode'><label>" + String(tr("Mode", "モード")) + "</label><select class='encoder-v2-rotation-mode' name='evm_" + idx + "' onchange='updateEncoderMode(this);validateEncoderV2(this.closest(\".enc\"))'>";
+        html += "<option value='0'" + String(amountMode ? " selected" : "") + ">" + String(tr("Rotation Amount", "回転量")) + "</option><option value='1'" + String(!amountMode ? " selected" : "") + ">" + String(tr("Rotation Direction", "回転方向")) + "</option></select></div>";
+        const String amountHidden = amountMode ? "" : " encoder-mode-hidden";
+        const String directionHidden = amountMode ? " encoder-mode-hidden" : "";
+        html += finiteFloat32InputHtml(tr("Minimum", "最小値"), "evn_" + idx, devices[i].enc.outputMin, "encoder-v2-amount encoder-v2-output-min" + amountHidden);
+        html += finiteFloat32InputHtml(tr("Maximum", "最大値"), "evx_" + idx, devices[i].enc.outputMax, "encoder-v2-amount encoder-v2-output-max" + amountHidden);
+        html += "<div class='encoder-v2-amount" + amountHidden + "'><label>" + String(tr("Beyond Minimum / Maximum", "最小値・最大値の先")) + "</label><select name='evw_" + idx + "'><option value='1'" + String(devices[i].enc.wrapAround ? " selected" : "") + ">" + String(tr("Loop", "🔄 ループする")) + "</option><option value='0'" + String(!devices[i].enc.wrapAround ? " selected" : "") + ">" + String(tr("Stop", "🛑 停止する")) + "</option></select></div>";
+        html += boundedIntegerInputHtml(tr("Range Steps", "範囲ステップ数"), "evs_" + idx, devices[i].enc.rangeSteps, 1, 65535, "encoder-v2-amount" + amountHidden);
+        html += "<div class='encoder-v2-amount encoder-v2-increase-direction" + amountHidden + "'><label>" + String(tr("Increase Direction", "回転方向")) + "</label><select name='evi_" + idx + "'><option value='0'" + String(!devices[i].enc.clockwiseIncreases ? " selected" : "") + ">" + String(tr("Counter-clockwise increases", "↪️ 反時計回りで大きくなる")) + "</option><option value='1'" + String(devices[i].enc.clockwiseIncreases ? " selected" : "") + ">" + String(tr("Clockwise increases", "↩️ 時計回りで大きくなる")) + "</option></select></div>";
+        html += "<div class='encoder-v2-direction encoder-v2-direction-value" + directionHidden + "'><label>" + String(tr("↪️ Counter-clockwise Value", "↪️ 反時計回りの値")) + "</label><input maxlength='128' name='evq_" + idx + "' value='" + htmlEscape(devices[i].enc.counterClockwiseValue) + "' oninput='limitBytes(this,128);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
+        html += "<div class='encoder-v2-direction encoder-v2-direction-value" + directionHidden + "'><label>" + String(tr("↩️ Clockwise Value", "↩️ 時計回りの値")) + "</label><input maxlength='128' name='evc_" + idx + "' value='" + htmlEscape(devices[i].enc.clockwiseValue) + "' oninput='limitBytes(this,128);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
+        html += "<div class='encoder-v2-type'><label>" + String(tr("Type", "型")) + "</label><select class='encoder-v2-output-type' name='evt_" + idx + "' onchange='validateEncoderV2(this.closest(\".enc\"))'><option value='0'" + String(devices[i].enc.outputType == TYPE_FLOAT ? " selected" : "") + ">Float</option><option value='1'" + String(devices[i].enc.outputType == TYPE_INT ? " selected" : "") + ">Int</option><option value='2'" + String(devices[i].enc.outputType == TYPE_STRING ? " selected" : "") + ">String</option></select></div>";
+      }
+      html += "</div></div><div class='click-section encoder-click'><strong>" + String(encoderV2 ? tr("Encoder Push", "エンコーダープッシュ") : tr("Encoder Click", "エンコーダークリック")) + "</strong>";
+      html += encoderV2 ? pushModeHtml("epm_" + idx, devices[i].enc.pushMode, "epr_" + idx, "esq_" + idx) : clickModeHtml("em_" + idx, devices[i].enc.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,devices[i].enc.pressMessages,devices[i].enc.pressMessageCount,devices[i].enc.releaseMessages,devices[i].enc.releaseMessageCount);
-      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Click Sequence", "クリックシーケンス")) + "</strong><div class='seq-grid'>";
+      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(encoderV2 ? tr("Push Sequence", "プッシュシーケンス") : tr("Click Sequence", "クリックシーケンス")) + "</strong>";
+      if (encoderV2) html += "<p class='note'>" + String(tr("Advance from Start by Step and return to Start after passing End.", "開始値から増減量ずつ進み、終了値を超えると開始値へ戻ります。")) + "</p>";
+      html += "<div class='seq-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "ek_" + idx,
                                devices[i].enc.clickSeq.address, "seq-address");
       html += finiteFloatInputHtml(tr("Start", "開始値"), "en_" + idx, devices[i].enc.clickSeq.start);
@@ -1464,14 +1515,17 @@ void handleSave() {
     if (!devices[i].active) continue;
     String idx = String(i);
     if (!server.hasArg("uid_" + idx)) continue;
+    String candidateDisplayName = devices[i].displayName;
     if (server.hasArg("nm_" + idx)) {
-      devices[i].displayName = server.arg("nm_" + idx);
-      devices[i].displayName.trim();
-      if (devices[i].displayName.length() > MAX_DEVICE_NAME_BYTES) {
+      candidateDisplayName = server.arg("nm_" + idx);
+      candidateDisplayName.trim();
+      if (candidateDisplayName.length() > MAX_DEVICE_NAME_BYTES) {
         sendUiResult(400, tr("Save error", "保存エラー"), tr("Device Name is too long. Reduce it and try again.", "デバイス名が長すぎます。短くしてからもう一度お試しください。"));
         return;
       }
     }
+    if (devices[i].type != CHAIN_ENCODER_TYPE_CODE)
+      devices[i].displayName = candidateDisplayName;
 
     if (devices[i].type == CHAIN_KEY_TYPE_CODE) {
       ChainDevice candidate = devices[i];
@@ -1523,30 +1577,129 @@ void handleSave() {
       if (!validOscAddressText(candidate.rotAddr, validationError)) {
         sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Rotation Address: ", "エンコーダー回転OSCアドレス: ")) + validationError); return;
       }
-      if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
-      candidate.wrapAround = server.hasArg("ew_" + idx);
-      if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
-          !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
-          !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
-          !parseFiniteFloatArg("eo_" + idx, candidate.map.outMin) ||
-          !parseFiniteFloatArg("eO_" + idx, candidate.map.outMax)) {
-        sendUiResult(400, tr("Save error", "保存エラー"),
-                     tr("Encoder rotation values must be finite values representable as 32-bit floating-point numbers.",
-                        "エンコーダー回転の数値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
-        return;
+      const bool encoderV2 = candidate.settingsModel == ENCODER_SETTINGS_V2;
+      if (encoderV2) {
+        if (!server.hasArg("evm_" + idx) || !server.hasArg("evt_" + idx) ||
+            !server.hasArg("epm_" + idx)) {
+          sendUiResult(400, tr("Save error", "保存エラー"),
+                       tr("Required Encoder v2 settings are missing.",
+                          "Encoder v2の必須設定が不足しています。"));
+          return;
+        }
+        const int rotationMode = server.arg("evm_" + idx).toInt();
+        const int outputType = server.arg("evt_" + idx).toInt();
+        const int pushMode = server.arg("epm_" + idx).toInt();
+        if (rotationMode < ENCODER_ROTATION_AMOUNT ||
+            rotationMode > ENCODER_ROTATION_DIRECTION ||
+            outputType < TYPE_FLOAT || outputType > TYPE_STRING ||
+            pushMode < MODE_PRESS_RELEASE || pushMode > MODE_SEQUENCE) {
+          sendUiResult(400, tr("Save error", "保存エラー"),
+                       tr("Encoder v2 mode or type is invalid.",
+                          "Encoder v2のモードまたは型が正しくありません。"));
+          return;
+        }
+        candidate.rotationMode = (EncoderRotationMode)rotationMode;
+        candidate.outputType = (ValueType)outputType;
+        candidate.pushMode = (KeyMode)pushMode;
+        candidate.clickMode = candidate.pushMode;
+
+        if (candidate.rotationMode == ENCODER_ROTATION_AMOUNT) {
+          int rangeSteps = 0;
+          if (!parseBoundedIntegerArg("evs_" + idx, 1, 65535,
+                                      rangeSteps) ||
+              !server.hasArg("evw_" + idx) ||
+              !server.hasArg("evi_" + idx)) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Range Steps must be an integer from 1 to 65535.",
+                            "範囲ステップ数は1～65535の整数で入力してください。"));
+            return;
+          }
+          const String wrapValue = server.arg("evw_" + idx);
+          const String increaseValue = server.arg("evi_" + idx);
+          if ((wrapValue != "0" && wrapValue != "1") ||
+              (increaseValue != "0" && increaseValue != "1")) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Encoder v2 Amount options are invalid.",
+                            "Encoder v2回転量の選択値が正しくありません。"));
+            return;
+          }
+          candidate.rangeSteps = (uint16_t)rangeSteps;
+          candidate.wrapAround = wrapValue == "1";
+          candidate.clockwiseIncreases = increaseValue == "1";
+          if (!parseFiniteFloatArg("evn_" + idx, candidate.outputMin) ||
+              !parseFiniteFloatArg("evx_" + idx, candidate.outputMax)) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Minimum and Maximum must be finite values representable as 32-bit floating-point numbers.",
+                            "最小値と最大値には有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+            return;
+          }
+        } else {
+          if (!server.hasArg("evc_" + idx) || !server.hasArg("evq_" + idx)) {
+            sendUiResult(400, tr("Save error", "保存エラー"),
+                         tr("Direction values are missing.",
+                            "回転方向の値が不足しています。"));
+            return;
+          }
+          candidate.clockwiseValue = server.arg("evc_" + idx);
+          candidate.counterClockwiseValue = server.arg("evq_" + idx);
+        }
+      } else {
+        if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
+        candidate.wrapAround = server.hasArg("ew_" + idx);
+        if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
+            !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
+            !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
+            !parseFiniteFloatArg("eo_" + idx, candidate.map.outMin) ||
+            !parseFiniteFloatArg("eO_" + idx, candidate.map.outMax)) {
+          sendUiResult(400, tr("Save error", "保存エラー"),
+                       tr("Encoder rotation values must be finite values representable as 32-bit floating-point numbers.",
+                          "エンコーダー回転の数値には、有限の32-bit浮動小数点数として表現できる値を入力してください。"));
+          return;
+        }
+        if (server.hasArg("et_" + idx)) candidate.map.outType = (ValueType)server.arg("et_" + idx).toInt();
+        if (server.hasArg("em_" + idx)) candidate.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
       }
-      if (server.hasArg("et_" + idx)) candidate.map.outType = (ValueType)server.arg("et_" + idx).toInt();
-      if (server.hasArg("em_" + idx)) candidate.clickMode = (KeyMode)server.arg("em_" + idx).toInt();
       if (!parseMessageList(idx,"e",candidate.pressMessages,candidate.pressMessageCount,candidate.releaseMessages,candidate.releaseMessageCount,validationError)) { sendUiResult(400,tr("Save error","保存エラー"),validationError); return; }
       if (candidate.pressMessageCount) candidate.press = candidate.pressMessages[0];
       if (candidate.releaseMessageCount) candidate.release = candidate.releaseMessages[0];
       if (!parseSequenceForm("ek_" + idx, "en_" + idx, "e2_" + idx,
                              "e3_" + idx, "el_" + idx,
                              candidate.clickSeq, validationError)) {
-        sendUiResult(400, tr("Save error", "保存エラー"), String(tr("Encoder Click Sequence: ", "エンコーダークリックシーケンス: ")) + validationError); return;
+        sendUiResult(400, tr("Save error", "保存エラー"), String(encoderV2 ? tr("Encoder Push Sequence: ", "エンコーダープッシュシーケンス: ") : tr("Encoder Click Sequence: ", "エンコーダークリックシーケンス: ")) + validationError); return;
       }
-      devices[i].enc = candidate;
-      devices[i].boundedEncInited = false;
+      if (encoderV2 && !encoderV2SettingsAreValid(candidate)) {
+        sendUiResult(400, tr("Save error", "保存エラー"),
+                     tr("Encoder v2 settings are invalid. Check the output range and values for the selected type.",
+                        "Encoder v2設定が正しくありません。選択した型の出力範囲と値を確認してください。"));
+        return;
+      }
+      ChainDevice deviceCandidate = devices[i];
+      deviceCandidate.displayName = candidateDisplayName;
+      deviceCandidate.enc = candidate;
+      if (!isPlaceholderUid(deviceCandidate.uid)) {
+        if (!canRegisterKnownDevice(deviceCandidate.uid,
+                                    deviceCandidate.type)) {
+          sendUiResult(
+              409, tr("Save error", "保存エラー"),
+              String(tr("The device settings exceed the per-type limit of ",
+                        "デバイスの設定が種別ごとの上限")) +
+                  String(MAX_KNOWN_PER_TYPE) +
+                  String(tr(".", "件を超えています。")));
+          return;
+        }
+#if TEST_FORCE_ENCODER_SAVE_FAILURE
+        const bool encoderSettingsSaved = false;
+#else
+        const bool encoderSettingsSaved = saveDeviceSettings(deviceCandidate);
+#endif
+        if (!encoderSettingsSaved) {
+          sendUiResult(507, tr("Save error", "保存エラー"), tr("The device configuration could not be written to storage. Delete messages or shorten Address and Value fields, then try again.", "デバイス設定をストレージへ書き込めませんでした。メッセージを削除するか、AddressとValueを短くしてからもう一度お試しください。"));
+          return;
+        }
+      }
+      devices[i] = deviceCandidate;
+      if (!encoderV2) devices[i].boundedEncInited = false;
+      continue;
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
       AngleOscConfig candidate = devices[i].angle;
       if (server.hasArg("aa_" + idx)) candidate.addr = server.arg("aa_" + idx);
