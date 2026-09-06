@@ -4,11 +4,11 @@
 
 | Item | Value |
 |---|---|
-| Test date | 2026-09-06 |
+| Test date | 2026-09-07 |
 | ChainOSC specification commit | `aa22fc356b621048c6576b0acf3a8f62d9e8a8ea` |
 | ChainOSC branch | `main` |
-| M5ChainOSC version | `1.11.3` |
-| Tested M5ChainOSC implementation commit | `95aa3eb4434fc1ca4408ecc28c37108de08e8e1c` |
+| M5ChainOSC version | `1.12.0` |
+| Tested M5ChainOSC implementation commit | `a71d6f806f65bd79bf988217f3ff81b7575e4d99` |
 | M5ChainOSC branch | `feature/device-preset-v2-encoder` |
 | Hardware | M5Stack AtomS3R with Chain Encoder |
 | PlatformIO environment | `atoms3r` |
@@ -25,10 +25,14 @@ specification commit recorded above.
 
 ## 2. Scope
 
+Implementation status: **Device Preset v2 Encoder implementation: COMPLETE**
+
 The tested scope is Device Preset v2 for Chain Encoder Amount and
 Direction modes, including Importer validation, export round trips,
-v1 migration classification, Encoder runtime semantics, UID continuity,
-and simultaneous operation of two connected Chain Encoders.
+V2 Push behavior, v1 migration classification, Legacy import and runtime,
+explicit Legacy-to-V2 migration, Legacy/V2 Web UI, transactional Save,
+Encoder runtime semantics, UID-based runtime continuity, and simultaneous
+operation of two connected Chain Encoders.
 
 Key, Angle, ToF, and Joystick Device Preset v2 behavior is outside this
 record's scope. Their common fixtures are reported as N/A rather than
@@ -99,8 +103,9 @@ Legacy-compatible storage/runtime classification. An invalid v1 preset
 remained an import error.
 
 This section records product-level Importer/migration classification and
-persistence results. Separate manual verification of every Legacy runtime
-behavior was not recorded and is therefore not asserted here.
+persistence results. Legacy runtime behavior, Legacy normal Save, explicit
+lossless migration, and the non-lossless manual editing path were also
+verified during final RC hardware testing.
 
 ## 7. Encoder Runtime Vector Results
 
@@ -138,6 +143,21 @@ and Chain Encoders:
 | Different UID | New Encoder started from position zero |
 | Encoder A to B to A | Per-UID cached positions were restored independently |
 | Two connected Encoders | Simultaneous connection and independent operation passed |
+| V2 Push Press/Release | Configured Press and Release messages were sent correctly |
+| V2 Push Sequence | Sequence advanced and wrapped as configured |
+| Legacy runtime | Existing Legacy behavior remained unchanged |
+| Legacy normal Save | Settings remained Legacy after normal Save |
+| Explicit lossless Legacy to V2 migration | Candidate generation and successful V2 transition passed |
+| Non-lossless migration editing path | No automatic correction; manual V2 editing passed |
+| Candidate before Save | No persistence, runtime change, reset, or OSC send |
+| V2 Save success UI | Transitioned immediately to normal V2 UI without reload |
+| Transactional Save failure | Legacy RAM, runtime, and persistence remained unchanged |
+| Export before migration | Device Preset `schemaVersion` remained 1 |
+| Export after migration | Device Preset `schemaVersion` changed to 2 only after successful Save |
+| Reboot persistence | Saved V2 model and behavior were restored after reboot |
+| Migration command URL | Migration query was removed after candidate generation |
+| Refresh after candidate generation | Migration command was not replayed |
+| RC hardware regression | PASS |
 
 For the Amount profiles, importing the preset itself emitted no OSC and
 the first subsequent Encoder step was applied from the reset position.
@@ -154,7 +174,7 @@ tested source state.
 | Resource | Usage | Result |
 |---|---|---|
 | RAM | 101,628 / 327,680 bytes (31.0%) | PASS |
-| Flash | 1,211,881 / 3,342,336 bytes (36.3%) | PASS |
+| Flash | 1,239,285 / 3,342,336 bytes (37.1%) | PASS |
 
 ## 10. Final Result
 
@@ -171,6 +191,7 @@ tested source state.
 | Physical hardware runtime | M5ChainOSC and Chain Encoder | PASS |
 | Two-Encoder simultaneous operation | Two connected Chain Encoders | PASS |
 | PlatformIO `atoms3r` build | Build verification | PASS |
+| Final Phase 5B RC hardware verification | Migration UI, Save, Export, reboot, and runtime checks | PASS |
 
 Overall result for the tested M5ChainOSC Device Preset v2 Encoder scope:
 
@@ -187,10 +208,9 @@ No known semantic mismatch remains in the tested scope.
 - Runtime hardware observations were manually judged rather than
   captured by an automated OSC packet assertion system.
 - Key and Sensor Device Preset v2 behavior is outside this record.
-- Separate exhaustive manual Legacy runtime behavior is not asserted.
 
 This record is reproducible using the exact ChainOSC and M5ChainOSC
 commits, branches, version, hardware, and PlatformIO environment recorded
-in Test Metadata. The tested implementation commit intentionally remains
-the Phase 4A/4B source checkpoint; adding test tools or this record does
-not change that firmware source revision.
+in Test Metadata. The tested implementation commit identifies the final
+Phase 5B and RC implementation source before release-closure documentation
+and version metadata updates.
