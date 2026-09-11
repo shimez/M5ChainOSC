@@ -267,7 +267,15 @@ Chain ToF converts measured distance into an OSC value.
 
 For example, with Maximum Distance `500`, output `0`–`1`, and `Near → Out Max / Far → Out Min`, a reading near 30 mm sends approximately `1` and approaches `0` near 500 mm. At 500 mm or beyond, transmission stops.
 
-## 11. Backup and restore
+## 11. Device Presets
+
+Open `…` on a Chain device to export or import its device-only settings as JSON. Presets do not contain a UID or Device Name, so settings can be shared between devices of the same type. Review the imported values and select `Save All Settings`.
+
+M5ChainOSC uses Device Preset v1 as the canonical format for Key and Device Preset v2 as the current normative target for Encoder, while also supporting compatible v1 Encoder imports. Key v1 is shared with M5ChainOSC, ChainOSCmini, ChainOSCnano, ChainOSCPad, and ChainOSC for Windows. Encoder v1 is shared with M5ChainOSC, ChainOSCmini, ChainOSCnano, and ChainOSCPad; Encoder v2 with M5ChainOSC and ChainOSCPad. Angle v1, ToF v1, and Joystick v1 are shared with M5ChainOSC, ChainOSCmini, and ChainOSCnano. `schemaVersion` is a format contract for each Device Type; see the [ChainOSC common specification](https://github.com/shimez/ChainOSC) for the detailed compatibility range. Intermediate draft v2 formats are not compatibility targets.
+
+[ChainOSC Device Presets](https://github.com/shimez/ChainOSC/tree/main/presets) provides examples for VRChat and other uses. Download a JSON file and import it from `…` on the target device card.
+
+## 12. Backup and restore
 
 Export JSON before major changes, firmware updates, or erasing all settings. The backup includes:
 

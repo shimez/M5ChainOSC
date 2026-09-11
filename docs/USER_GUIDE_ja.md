@@ -280,7 +280,15 @@ Chain ToFの距離をOSCへ変換します。
 
 例えば`Maximum Distance = 500`、`Out Min = 0`、`Out Max = 1`、`Near → Out Max / Far → Out Min`の場合、30 mm付近で約`1`、500 mmへ近づくにつれて`0`へ変化します。500 mm以上では送信を停止します。
 
-## 11. 設定のバックアップと復元
+## 11. Device Preset
+
+各Chainデバイス右上の`…`から、デバイス単体の設定をJSONとしてエクスポート／インポートできます。PresetにはUIDとDevice Nameを含まないため、同種デバイス間で設定を共有できます。インポート後は内容を確認し、`Save All Settings`を押してください。
+
+M5ChainOSCのKeyはDevice Preset v1、Encoderはv2を現在のnormative targetとし、v1互換Importも扱います。Key v1はM5ChainOSC、ChainOSCmini、ChainOSCnano、ChainOSCPad、ChainOSC for Windowsと共有できます。Encoder v1はM5ChainOSC、ChainOSCmini、ChainOSCnano、ChainOSCPadと、Encoder v2はM5ChainOSCとChainOSCPadと共有できます。Angle v1、ToF v1、Joystick v1はM5ChainOSC、ChainOSCmini、ChainOSCnanoと共有できます。schemaVersionはDevice Typeごとのformat contractであり、詳細な互換範囲は[ChainOSC共通仕様](https://github.com/shimez/ChainOSC)を参照してください。中間的なdraft v2形式は互換対象ではありません。
+
+[ChainOSC Device Presets](https://github.com/shimez/ChainOSC/tree/main/presets)では、VRChatなどで利用できるサンプルを公開しています。JSONファイルをダウンロードし、対象デバイスの`…`からImportして利用できます。
+
+## 12. 設定のバックアップと復元
 
 大きな変更、ファームウェア更新、全設定初期化の前にJSONをエクスポートすることをおすすめします。
 

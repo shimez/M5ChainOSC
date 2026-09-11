@@ -146,7 +146,7 @@ Web UIの`Export Settings (JSON)`から保存済み設定をダウンロード�
 
 すぐに利用できるVRChat向けサンプルは、[Device Presets](presets/README.md)で公開しています。
 
-ファームウェアの書き込みからプリセットを使ったVRChatでの動作確認までは、[プリセット・クイックスタート](https://shimez.github.io/M5ChainOSC/quick-start-presets/)を参照してください。
+ファームウェアの書き込みからChain Keyを使ったVRChatでの動作確認までは、[クイックスタート](https://shimez.github.io/M5ChainOSC/quick-start/)を参照してください。
 
 - JoystickによるVRChat内の移動とジャンプ
 - KeyによるマイクのON／OFF
@@ -174,10 +174,14 @@ src/
   wifi_manager.*        Wi-Fi STA／AP処理
   osc_send.*            OSC送信
 docs/
+  QUICK_START_en.md
+                        English Quick Start
+  QUICK_START_ja.md
+                        日本語クイックスタート
   QUICK_START_PRESETS_en.md
-                        Preset Quick Start in English
+                        旧Preset Quick Start landing page
   QUICK_START_PRESETS_ja.md
-                        プリセットを使ったクイックスタート
+                        旧Preset Quick Start landing page
   USER_GUIDE_en.md      English User Guide
   USER_GUIDE_ja.md      日本語ユーザーガイド
   installer/            正式版Web Installer
