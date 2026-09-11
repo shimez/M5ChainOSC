@@ -72,7 +72,7 @@ AtomS3Rと同じネットワークに接続しているアダプターの`IPv4 A
 
 ## 6. プリセットをダウンロードする
 
-[Device Presets](https://github.com/shimez/M5ChainOSC/tree/main/presets)から、接続したデバイスと同じ種類のJSONファイルを選びます。GitHubでファイルを開き、`Download raw file`を押して保存してください。
+[Device Presets](https://github.com/shimez/ChainOSC/tree/main/presets)から、接続したデバイスと同じ種類のJSONファイルを選びます。GitHubでファイルを開き、`Download raw file`を押して保存してください。
 
 利用できるサンプルには次のようなものがあります。
 

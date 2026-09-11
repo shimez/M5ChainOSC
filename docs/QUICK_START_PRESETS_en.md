@@ -70,7 +70,7 @@ Find the `IPv4 Address` of the Wi-Fi or Ethernet adapter connected to the same n
 
 ## 6. Download a preset
 
-Open [Device Presets](https://github.com/shimez/M5ChainOSC/tree/main/presets), choose a JSON file for the same device type, and select GitHub's `Download raw file` button.
+Open [Device Presets](https://github.com/shimez/ChainOSC/tree/main/presets), choose a JSON file for the same device type, and select GitHub's `Download raw file` button.
 
 | Device | Preset | Behavior |
 | --- | --- | --- |
