@@ -135,7 +135,7 @@ Web UIの`Export Settings (JSON)`から保存済み設定をダウンロード�
 接続中の各Chainデバイス右上にある`…`メニューから、そのデバイス単体の設定をJSONとしてエクスポート・インポートできます。
 
 - プリセットにはUIDとDevice Nameを含みません。
-- プリセット形式`ChainOSC-device-preset`はChainOSCminiと共通です。
+- プリセット形式`ChainOSC-device-preset`はChainOSCシリーズ共通です。
 - 旧形式`M5ChainOSC-device-preset`も引き続きインポートできます。
 - 同じ種類のChainデバイスにだけインポートできます。
 - インポート先のUIDとDevice Nameは維持されます。
@@ -144,7 +144,7 @@ Web UIの`Export Settings (JSON)`から保存済み設定をダウンロード�
 
 この機能は、設定サンプルをほかの利用者へ共有する用途を想定しています。本体全体の移行や復旧には、従来のSettings Backupを使用してください。
 
-すぐに利用できるVRChat向けサンプルは、[Device Presets](presets/README.md)で公開しています。
+すぐに利用できるVRChat向けサンプルは、[ChainOSC Device Presets](https://github.com/shimez/ChainOSC/tree/main/presets)で公開しています。
 
 ファームウェアの書き込みからChain Keyを使ったVRChatでの動作確認までは、[クイックスタート](https://shimez.github.io/M5ChainOSC/quick-start/)を参照してください。
 
@@ -186,8 +186,8 @@ docs/
   USER_GUIDE_ja.md      日本語ユーザーガイド
   installer/            正式版Web Installer
 presets/
-  README.md              デバイスプリセット一覧と使用方法
-  README_en.md           Device preset guide in English
+  README.md              旧コンテンツ。presetsは https://github.com/shimez/ChainOSC/tree/main/presets に移動済み
+  README_en.md           Old contents
 licenses/
   LGPL-2.1.txt           Arduino-ESP32に適用されるライセンス本文
 ```
