@@ -1340,8 +1340,10 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
 
     html += "<div class='card device' data-device-index='" + idx + "' data-collapse-key='" + htmlEscape(devices[i].uid) + "'><div class='device-head'><h2>";
     html += "<button id='collapse-" + idx + "' class='collapse-button' type='button' aria-label='" + String(tr("Collapse or expand device settings", "デバイス設定を折りたたむ／展開する")) + "' aria-expanded='true' onclick=\"toggleDeviceCollapse(" + idx + ",'" + devices[i].uid + "')\">&#9660;</button>";
-    html += "<span class='badge badge-type'>" + String(typeToName(devices[i].type)) + "</span>";
-    html += " #" + String(devices[i].chainId);
+    html += " <span class='badge badge-type'>#" + String(devices[i].chainId) + " " + String(typeToName(devices[i].type)) + "</span>";
+    if (devices[i].displayName.length()) {
+      html += " " + htmlEscape(devices[i].displayName);
+    }
     html += " <span class='badge badge-on'>" + String(tr("Connected", "接続済み")) + "</span></h2>";
     if (!ph && devices[i].type != CHAIN_UNKNOWN_TYPE_CODE) {
       html += "<div class='device-menu-wrap'><button class='more-button' type='button' aria-label='" + String(tr("Device menu", "デバイスメニュー")) + "' aria-expanded='false' onclick='toggleDeviceMenu(event," + idx + ")'>&hellip;</button>";
