@@ -1344,7 +1344,7 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
     if (devices[i].displayName.length()) {
       html += " " + htmlEscape(devices[i].displayName);
     }
-    html += " <span class='badge badge-on'>" + String(tr("Connected", "接続済み")) + "</span></h2>";
+    html += "</h2>";
     if (!ph && devices[i].type != CHAIN_UNKNOWN_TYPE_CODE) {
       html += "<div class='device-menu-wrap'><button class='more-button' type='button' aria-label='" + String(tr("Device menu", "デバイスメニュー")) + "' aria-expanded='false' onclick='toggleDeviceMenu(event," + idx + ")'>&hellip;</button>";
       html += "<div id='device-menu-" + idx + "' class='device-menu' onclick='event.stopPropagation()'>";
