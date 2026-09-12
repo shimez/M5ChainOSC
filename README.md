@@ -188,10 +188,6 @@ docs/
 presets/
   README.md              デバイスプリセット一覧と使用方法
   README_en.md           Device preset guide in English
-  angle/                 Angle用プリセット
-  encoder/               Encoder用プリセット
-  joystick/              Joystick用プリセット
-  key/                   Key用プリセット
 licenses/
   LGPL-2.1.txt           Arduino-ESP32に適用されるライセンス本文
 ```
