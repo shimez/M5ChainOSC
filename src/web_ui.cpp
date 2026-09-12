@@ -141,6 +141,48 @@ static String float32Text(float value) {
   return String(text);
 }
 
+static float legacyEncoderDirectionOutput(const EncoderOscConfig& legacy,
+                                          int direction) {
+  const float value = (float)direction * legacy.incScale;
+  const float minimum = min(legacy.map.outMin, legacy.map.outMax);
+  const float maximum = max(legacy.map.outMin, legacy.map.outMax);
+  return constrain(value, minimum, maximum);
+}
+
+static String legacyEncoderDirectionText(const EncoderOscConfig& legacy,
+                                         int direction) {
+  const float value = legacyEncoderDirectionOutput(legacy, direction);
+  if (legacy.map.outType == TYPE_INT)
+    return String((int32_t)lroundf(value));
+  return String(value, legacy.map.outType == TYPE_STRING ? 3 : 7);
+}
+
+static EncoderOscConfig buildEditableEncoderV2MigrationCandidate(
+    const EncoderOscConfig& legacy) {
+  EncoderOscConfig candidate = legacy;
+  candidate.settingsModel = ENCODER_SETTINGS_V2;
+  candidate.outputType = legacy.map.outType;
+  candidate.pushMode = legacy.clickMode;
+  if (legacy.sendIncrement) {
+    candidate.rotationMode = ENCODER_ROTATION_DIRECTION;
+    candidate.clockwiseValue = legacyEncoderDirectionText(legacy, 1);
+    candidate.counterClockwiseValue = legacyEncoderDirectionText(legacy, -1);
+  } else {
+    candidate.rotationMode = ENCODER_ROTATION_AMOUNT;
+    candidate.wrapAround = legacy.wrapAround;
+    candidate.clockwiseIncreases = true;
+    candidate.outputMin = legacy.map.outMin;
+    candidate.outputMax = legacy.map.outMax;
+    const float span = legacy.absInMax - legacy.absInMin;
+    candidate.rangeSteps =
+        isfinite(span) && span >= 1.0f && span <= 65535.0f &&
+                floorf(span) == span
+            ? (uint16_t)span
+            : 0;
+  }
+  return candidate;
+}
+
 static void sendUiResult(int status, const String& title, const String& message,
                          bool showBack = true) {
   if (server.hasArg("ajax")) {
@@ -1328,12 +1370,8 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       encoderMigrationEditing = true;
       encoderMigrationLossless =
           buildEncoderV2MigrationCandidate(devices[i].enc, encoderUi);
-      if (!encoderMigrationLossless) {
-        ChainDevice defaultDevice;
-        setDefaultDeviceMessages(defaultDevice);
-        encoderUi = defaultDevice.enc;
-        encoderUi.settingsModel = ENCODER_SETTINGS_V2;
-      }
+      if (!encoderMigrationLossless)
+        encoderUi = buildEditableEncoderV2MigrationCandidate(devices[i].enc);
     }
     bool encSeq = (encoderUi.settingsModel == ENCODER_SETTINGS_V2
                        ? encoderUi.pushMode
@@ -1435,10 +1473,10 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
         html += "<div class='encoder-v2-direction encoder-v2-direction-value" + directionHidden + "'><label>" + String(tr("↩️ Clockwise Value", "↩️ 時計回りの値")) + "</label><input maxlength='128' name='evc_" + idx + "' value='" + htmlEscape(encoderUi.clockwiseValue) + "' oninput='limitBytes(this,128);validateEncoderV2(this.closest(\".enc\"))'><small class='numeric-error err'></small></div>";
         html += "<div class='encoder-v2-type'><label>" + String(tr("Type", "型")) + "</label><select class='encoder-v2-output-type' name='evt_" + idx + "' onchange='validateEncoderV2(this.closest(\".enc\"))'><option value='0'" + String(encoderUi.outputType == TYPE_FLOAT ? " selected" : "") + ">Float</option><option value='1'" + String(encoderUi.outputType == TYPE_INT ? " selected" : "") + ">Int</option><option value='2'" + String(encoderUi.outputType == TYPE_STRING ? " selected" : "") + ">String</option></select></div>";
       }
-      html += "</div></div><div class='click-section encoder-click'><strong>" + String(encoderV2 ? tr("Encoder Push", "エンコーダープッシュ") : tr("Encoder Click", "エンコーダークリック")) + "</strong>";
+      html += "</div></div><div class='click-section encoder-click'><strong>" + String(tr("Encoder Push", "エンコーダープッシュ")) + "</strong>";
       html += encoderV2 ? pushModeHtml("epm_" + idx, encoderUi.pushMode, "epr_" + idx, "esq_" + idx) : clickModeHtml("em_" + idx, encoderUi.clickMode, "epr_" + idx, "esq_" + idx);
       html += clickMessagesHtml(idx,"e",encSeq,encoderUi.pressMessages,encoderUi.pressMessageCount,encoderUi.releaseMessages,encoderUi.releaseMessageCount);
-      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(encoderV2 ? tr("Push Sequence", "プッシュシーケンス") : tr("Click Sequence", "クリックシーケンス")) + "</strong>";
+      html += "<div id='esq_" + idx + "' class='click-sequence sequence-card' style='display:" + String(encSeq ? "block" : "none") + "'><strong>" + String(tr("Push Sequence", "プッシュシーケンス")) + "</strong>";
       if (encoderV2) html += "<p class='note'>" + String(tr("Advance from Start by Step and return to Start after passing End.", "開始値から増減量ずつ進み、終了値を超えると開始値へ戻ります。")) + "</p>";
       html += "<div class='seq-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "ek_" + idx,
