@@ -6,6 +6,32 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
+## [1.12.3] - 2026-09-13
+
+### Changed
+
+- Legacy Encoderの回転設定を3列レイアウトへ整理し、ChainOSCminiと同じ項目順・表示形式へ統一
+- IncrementモードではAbsolute専用項目を非表示にしつつ、他の項目の表示位置を維持するよう調整
+
+## [1.12.2] - 2026-09-12
+
+### Changed
+
+- Legacy Encoder設定とV2移行候補のWeb UIをChainOSCPadと同じ注意表示、フォーム配置、確認フローへ統一
+- LegacyからV2への移行時に、OSC Addressおよび意味的に移行可能な設定値を候補へ引き継ぐよう改善
+
+### Fixed
+
+- V2移行候補を生成した段階では保存済みLegacy設定を変更せず、確認後の保存成功時だけV2へ移行するよう修正
+
+## [1.12.1] - 2026-09-12
+
+### Changed
+
+- 接続中Device Cardのヘッダーを、Device TypeをまたいだChain IDの1始まり表示とDevice Typeを組み合わせたバッジへ整理
+- 接続中Device Cardから冗長な「接続済み」表示を削除し、保存済みデバイス設定の接続状態表示は維持
+- Device Presetサンプルの案内先をChainOSC共通リポジトリへ移行し、READMEとユーザードキュメントを更新
+
 ## [1.12.0] - 2026-09-07
 
 ### Added
@@ -279,7 +305,12 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.11.2...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.12.3...HEAD
+[1.12.3]: https://github.com/shimez/M5ChainOSC/compare/v1.12.2...v1.12.3
+[1.12.2]: https://github.com/shimez/M5ChainOSC/compare/v1.12.1...v1.12.2
+[1.12.1]: https://github.com/shimez/M5ChainOSC/compare/v1.12.0...v1.12.1
+[1.12.0]: https://github.com/shimez/M5ChainOSC/compare/v1.11.3...v1.12.0
+[1.11.3]: https://github.com/shimez/M5ChainOSC/compare/v1.11.2...v1.11.3
 [1.11.2]: https://github.com/shimez/M5ChainOSC/compare/v1.11.1...v1.11.2
 [1.11.1]: https://github.com/shimez/M5ChainOSC/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/shimez/M5ChainOSC/compare/v1.10.0...v1.11.0

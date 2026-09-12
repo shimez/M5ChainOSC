@@ -1213,7 +1213,7 @@ button{width:100%;padding:12px;background:#28a745;color:#fff;border:none;border-
 .release{border-left:5px solid #007bff;padding-left:10px;margin-top:12px}
 .seq{border-left:5px solid #20c997;padding-left:10px;margin-top:12px}
 .click-sequence{padding:10px;margin-top:12px}
-.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{display:none}.encoder-legacy-mode{order:1}.encoder-legacy-wrap{order:2}.encoder-legacy-type{order:3}.encoder-legacy-input-min{order:4}.encoder-legacy-input-max{order:5}.encoder-legacy-scale{order:6}.encoder-legacy-output-min{order:7}.encoder-legacy-output-max{order:8}.encoder-model{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;background:#fff3cd;color:#795700;font-size:.75em;font-weight:normal}.encoder-model-v2{background:#dff3e5;color:#216e39}.encoder-legacy-status,.encoder-migration-panel{margin:14px 0 18px;padding:14px 16px;border:1px solid #f0c36a;border-radius:9px;background:#fff9e8}.encoder-legacy-status{display:flex;flex-direction:column;gap:5px}.encoder-legacy-status span{color:#68758a}.encoder-migration-action{display:inline-block;align-self:flex-start;width:auto;margin:14px 0 0;padding:7px 12px;border:0;border-radius:7px;background:#3267e3;color:#fff;font-size:.85em}.encoder-migration-panel ul{margin:10px 0 12px;padding-left:22px}.encoder-migration-confirm{display:flex;align-items:center;gap:9px;margin-top:0;font-weight:normal}.encoder-migration-confirm input{width:auto;margin:0}.encoder-migration-cancel{display:inline-block;width:auto;margin-top:12px;padding:11px 16px;border:0;border-radius:7px;background:#64748b;color:#fff;text-decoration:none}.encoder-v2-mode{grid-column:1/-1}.encoder-v2-mode-fields{display:contents}.encoder-v2-direction-value input{font-family:inherit}.encoder-v2-amount-active .encoder-v2-type{order:1}.encoder-v2-amount-active .encoder-v2-increase-direction{order:2}
+.enc{border-left:5px solid #fd7e14;padding-left:10px;margin-top:12px}.encoder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.encoder-grid label{margin-top:0}.encoder-address{grid-column:1/-1}.encoder-mode-hidden{display:none}.enc:not(.encoder-v2) .encoder-absolute-setting.encoder-mode-hidden{display:block;visibility:hidden;pointer-events:none}.encoder-legacy-mode{order:1}.encoder-legacy-input-min{order:2}.encoder-legacy-input-max{order:3}.encoder-legacy-wrap{order:4}.encoder-legacy-scale{order:5}.encoder-legacy-output-min{order:6}.encoder-legacy-output-max{order:7}.encoder-legacy-type{order:8}.encoder-legacy-wrap label{display:flex;align-items:center;gap:6px;margin:0}.encoder-legacy-wrap input{width:auto;margin:0}.encoder-model{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;background:#fff3cd;color:#795700;font-size:.75em;font-weight:normal}.encoder-model-v2{background:#dff3e5;color:#216e39}.encoder-legacy-status,.encoder-migration-panel{margin:14px 0 18px;padding:14px 16px;border:1px solid #f0c36a;border-radius:9px;background:#fff9e8}.encoder-legacy-status{display:flex;flex-direction:column;gap:5px}.encoder-legacy-status span{color:#68758a}.encoder-migration-action{display:inline-block;align-self:flex-start;width:auto;margin:14px 0 0;padding:7px 12px;border:0;border-radius:7px;background:#3267e3;color:#fff;font-size:.85em}.encoder-migration-panel ul{margin:10px 0 12px;padding-left:22px}.encoder-migration-confirm{display:flex;align-items:center;gap:9px;margin-top:0;font-weight:normal}.encoder-migration-confirm input{width:auto;margin:0}.encoder-migration-cancel{display:inline-block;width:auto;margin-top:12px;padding:11px 16px;border:0;border-radius:7px;background:#64748b;color:#fff;text-decoration:none}.encoder-v2-mode{grid-column:1/-1}.encoder-v2-mode-fields{display:contents}.encoder-v2-direction-value input{font-family:inherit}.encoder-v2-amount-active .encoder-v2-type{order:1}.encoder-v2-amount-active .encoder-v2-increase-direction{order:2}
 .ang{border-left:5px solid #6610f2;padding-left:10px;margin-top:12px}.angle-grid,.tof-grid,.joystick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.angle-grid label,.tof-grid label,.joystick-grid label{margin-top:0}.angle-address,.tof-address,.joystick-address,.joystick-invert{grid-column:1/-1}.joystick-invert{display:flex;gap:18px;flex-wrap:wrap}.joystick-invert label{display:flex;align-items:center;gap:6px;margin:0}.joystick-invert input{width:auto;margin:0}
 .joy{border-left:5px solid #e83e8c;padding-left:10px;margin-top:12px}
 .device{border-left:5px solid #6f42c1}
@@ -1449,12 +1449,13 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
                                "er_" + idx, encoderUi.rotAddr,
                                "encoder-address");
       if (!encoderV2) {
-        html += "<div class='encoder-legacy-mode'><label>" + String(tr("Legacy Mode", "旧形式モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!encoderUi.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
+        html += "<div class='encoder-legacy-mode'><label>" + String(tr("Mode", "モード")) + "</label><select name='ei_" + idx + "' onchange='updateEncoderMode(this)'><option value='0'" + String(!encoderUi.sendIncrement ? " selected" : "") + ">" + String(tr("Absolute", "絶対値")) + "</option>";
         html += "<option value='1'" + String(encoderUi.sendIncrement ? " selected" : "") + ">" + String(tr("Increment", "増分")) + "</option></select></div>";
-        html += "<div class='encoder-legacy-wrap'><label>" + String(tr("At Minimum / Maximum", "最小値・最大値の先")) + "</label><select name='ew_" + idx + "'><option value='1'" + String(encoderUi.wrapAround ? " selected" : "") + ">" + String(tr("Wrap (Legacy semantics)", "ループする（旧形式の動作）")) + "</option><option value='0'" + String(!encoderUi.wrapAround ? " selected" : "") + ">" + String(tr("Stop", "停止する")) + "</option></select></div>";
+        html += "<div class='encoder-legacy-wrap encoder-absolute-setting" + String(encoderUi.sendIncrement ? " encoder-mode-hidden" : "") + "'><label><input type='checkbox' name='ew_" + idx + "' value='1'" + String(encoderUi.wrapAround ? " checked" : "") + "> " + String(tr("Wrap around", "範囲をループする")) + "</label></div>";
         html += "<div class='encoder-legacy-type'><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("et_" + idx, encoderUi.map.outType) + "</div>";
-        html += finiteFloatInputHtml(tr("Absolute Input Min", "絶対値入力の最小値"), "e0_" + idx, encoderUi.absInMin, "encoder-legacy-input-min");
-        html += finiteFloatInputHtml(tr("Absolute Input Max", "絶対値入力の最大値"), "e1_" + idx, encoderUi.absInMax, "encoder-legacy-input-max");
+        const String absoluteHiddenClass = encoderUi.sendIncrement ? " encoder-mode-hidden" : "";
+        html += finiteFloatInputHtml(tr("Absolute Input Min", "絶対値入力の最小値"), "e0_" + idx, encoderUi.absInMin, "encoder-legacy-input-min encoder-absolute-setting" + absoluteHiddenClass);
+        html += finiteFloatInputHtml(tr("Absolute Input Max", "絶対値入力の最大値"), "e1_" + idx, encoderUi.absInMax, "encoder-legacy-input-max encoder-absolute-setting" + absoluteHiddenClass);
         html += finiteFloatInputHtml(tr("Increment Scale", "増分倍率"), "es_" + idx, encoderUi.incScale, "encoder-legacy-scale");
         html += finiteFloatInputHtml(tr("Output Min", "出力最小値"), "eo_" + idx, encoderUi.map.outMin, "encoder-legacy-output-min");
         html += finiteFloatInputHtml(tr("Output Max", "出力最大値"), "eO_" + idx, encoderUi.map.outMax, "encoder-legacy-output-max");
@@ -1750,15 +1751,7 @@ void handleSave() {
         }
       } else {
         if (server.hasArg("ei_" + idx)) candidate.sendIncrement = server.arg("ei_" + idx).toInt() != 0;
-        if (!server.hasArg("ew_" + idx) ||
-            (server.arg("ew_" + idx) != "0" &&
-             server.arg("ew_" + idx) != "1")) {
-          sendUiResult(400, tr("Save error", "保存エラー"),
-                       tr("The Legacy Encoder endpoint option is invalid.",
-                          "旧形式Encoderの端点設定が正しくありません。"));
-          return;
-        }
-        candidate.wrapAround = server.arg("ew_" + idx) == "1";
+        candidate.wrapAround = server.hasArg("ew_" + idx);
         if (!parseFiniteFloatArg("e0_" + idx, candidate.absInMin) ||
             !parseFiniteFloatArg("e1_" + idx, candidate.absInMax) ||
             !parseFiniteFloatArg("es_" + idx, candidate.incScale) ||
