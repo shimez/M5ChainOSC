@@ -1487,15 +1487,16 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += finiteFloatInputHtml(tr("Step", "増減量"), "e3_" + idx, encoderUi.clickSeq.step);
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("el_" + idx, encoderUi.clickSeq.valueType) + "</div></div></div></div>";
     } else if (devices[i].type == CHAIN_ANGLE_TYPE_CODE) {
-      html += "<div class='ang'><strong>" + String(tr("Angle", "角度")) + "</strong><div class='angle-grid'>";
+      html += "<div class='ang'><strong>Angle</strong><div class='angle-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "aa_" + idx,
                                devices[i].angle.addr, "angle-address");
       html += "<div><label>" + String(tr("Resolution", "分解能")) + "</label><select name='a1_" + idx + "' onchange='updateAngleResolution(this)'><option value='1'" + String(devices[i].angle.use12bit ? " selected" : "") + ">12-bit</option>";
       html += "<option value='0'" + String(!devices[i].angle.use12bit ? " selected" : "") + ">8-bit</option></select></div>";
-      html += boundedIntegerInputHtml(tr("Deadband", "不感帯"), "ad_" + idx, devices[i].angle.deadband, 1, devices[i].angle.use12bit ? 4095 : 255, "angle-deadband");
+      html += boundedIntegerInputHtml(tr("Minimum Change", "最小変化量"), "ad_" + idx, devices[i].angle.deadband, 1, devices[i].angle.use12bit ? 4095 : 255, "angle-deadband");
       html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "ao_" + idx, devices[i].angle.map.outMin);
       html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "aO_" + idx, devices[i].angle.map.outMax);
-      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div></div></div>";
+      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("at_" + idx, devices[i].angle.map.outType) + "</div>";
+      html += "<p class='note angle-address'>" + String(tr("Changes smaller than Minimum Change do not send OSC messages.", "最小変化量に満たない変化ではOSCメッセージを送信しません。")) + "</p></div></div>";
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
       html += "<div class='joy'><strong>" + String(tr("Joystick XY", "ジョイスティック XY")) + "</strong><div class='joystick-grid'>";
       html += addressInputHtml(tr("X Address", "X軸OSCアドレス"), "jx_" + idx,
@@ -1504,10 +1505,11 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
                                devices[i].joy.yAddr, "joystick-address");
       html += "<div class='joystick-invert'><label><input type='checkbox' name='jix_" + idx + "' value='1'" + String(devices[i].joy.invertX ? " checked" : "") + "><span>" + String(tr("Invert X (+/-)", "X軸反転 (+/-)")) + "</span></label>";
       html += "<label><input type='checkbox' name='jiy_" + idx + "' value='1'" + String(devices[i].joy.invertY ? " checked" : "") + "><span>" + String(tr("Invert Y (+/-)", "Y軸反転 (+/-)")) + "</span></label></div>";
-      html += boundedIntegerInputHtml(tr("Deadband", "不感帯"), "jd_" + idx, devices[i].joy.deadband, 1, 254);
+      html += boundedIntegerInputHtml(tr("Minimum Change", "最小変化量"), "jd_" + idx, devices[i].joy.deadband, 1, 254);
       html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "jo_" + idx, devices[i].joy.map.outMin);
       html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "jO_" + idx, devices[i].joy.map.outMax);
-      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div></div></div>";
+      html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + typeSelectHtml("jt_" + idx, devices[i].joy.map.outType) + "</div>";
+      html += "<p class='note joystick-address'>" + String(tr("Changes smaller than Minimum Change do not send OSC messages.", "最小変化量に満たない変化ではOSCメッセージを送信しません。")) + "</p></div></div>";
       html += "<div class='click-section joystick-click'>";
       html += clickModeHtml("jm_" + idx, devices[i].joy.clickMode, "jpr_" + idx, "jsq_" + idx);
       html += clickMessagesHtml(idx,"j",joySeq,devices[i].joy.pressMessages,devices[i].joy.pressMessageCount,devices[i].joy.releaseMessages,devices[i].joy.releaseMessageCount);
@@ -1519,10 +1521,10 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += finiteFloatInputHtml(tr("Step", "増減量"), "j3_" + idx, devices[i].joy.clickSeq.step);
       html += "<div><label>" + String(tr("Type", "型")) + "</label>" + typeSelectHtml("jl_" + idx, devices[i].joy.clickSeq.valueType) + "</div></div></div></div>";
     } else if (devices[i].type == CHAIN_TOF_TYPE_CODE) {
-      html += "<div class='ang'><strong>" + String(tr("ToF Distance (mm)", "ToF距離 (mm)")) + "</strong><div class='tof-grid'>";
+      html += "<div class='ang'><strong>" + String(tr("ToF Distance", "ToF距離")) + "</strong><div class='tof-grid'>";
       html += addressInputHtml(tr("Address", "OSCアドレス"), "fa_" + idx,
                                devices[i].tof.addr, "tof-address");
-      html += boundedIntegerInputHtml(tr("Deadband (mm)", "不感帯 (mm)"), "fd_" + idx, devices[i].tof.deadband, 1, 2000);
+      html += boundedIntegerInputHtml(tr("Minimum Change (mm)", "最小変化量 (mm)"), "fd_" + idx, devices[i].tof.deadband, 1, 2000);
       html += boundedIntegerInputHtml(tr("Maximum Distance (mm)", "最大距離 (mm)"), "fm_" + idx, devices[i].tof.maxDistanceMm, 31, 2000);
       html += "<div><label>" + String(tr("Output Direction", "出力方向")) + "</label><select name='fi_" + idx + "'>";
       html += "<option value='0'" + String(!devices[i].tof.nearValueHigh ? " selected" : "") + ">" + String(tr("Near → Out Min / Far → Out Max", "近い → 出力最小値／遠い → 出力最大値")) + "</option>";
@@ -1530,7 +1532,8 @@ window.settingsDirty=false;window.settingsSubmitting=false;window.addEventListen
       html += finiteFloatInputHtml(tr("Out Min", "出力最小値"), "fo_" + idx, devices[i].tof.map.outMin);
       html += finiteFloatInputHtml(tr("Out Max", "出力最大値"), "fO_" + idx, devices[i].tof.map.outMax);
       html += "<div><label>" + String(tr("Out Type", "出力の型")) + "</label>" + numericTypeSelectHtml("ft_" + idx, devices[i].tof.map.outType) + "</div>";
-      html += "<p class='note tof-address'>" + String(tr("Active range: 30 mm to less than Maximum Distance. OSC transmission stops outside this range.", "有効範囲は30 mm以上、最大距離未満です。範囲外ではOSC送信を停止します。")) + "</p></div></div>";
+      html += "<p class='note tof-address'>" + String(tr("Changes smaller than Minimum Change do not send OSC messages.", "最小変化量に満たない変化ではOSCメッセージを送信しません。")) + "<br>";
+      html += String(tr("OSC is sent only while the measured distance is 30 mm or more and less than Maximum Distance.", "測定距離が30 mm以上かつ最大距離未満の間だけOSCを送信します。")) + "</p></div></div>";
     } else {
       html += "<p class='note'>Type code: " + String((int)devices[i].type) + "</p>";
     }
@@ -1820,10 +1823,10 @@ void handleSave() {
                                   candidate.deadband)) {
         sendUiResult(400, tr("Save error", "保存エラー"),
                      candidate.use12bit
-                         ? tr("Angle Deadband must be an integer from 1 to 4095 in 12-bit mode.",
-                              "Angleの不感帯は12-bitモードでは1～4095の整数で入力してください。")
-                         : tr("Angle Deadband must be an integer from 1 to 255 in 8-bit mode.",
-                              "Angleの不感帯は8-bitモードでは1～255の整数で入力してください。"));
+                         ? tr("Angle Minimum Change must be an integer from 1 to 4095 in 12-bit mode.",
+                              "Angleの最小変化量は12-bitモードでは1～4095の整数で入力してください。")
+                         : tr("Angle Minimum Change must be an integer from 1 to 255 in 8-bit mode.",
+                              "Angleの最小変化量は8-bitモードでは1～255の整数で入力してください。"));
         return;
       }
       if (!parseFiniteFloatArg("ao_" + idx, candidate.map.outMin) ||
@@ -1850,8 +1853,8 @@ void handleSave() {
       if (!parseBoundedIntegerArg("jd_" + idx, 1, 254,
                                   candidate.deadband)) {
         sendUiResult(400, tr("Save error", "保存エラー"),
-                     tr("Joystick Deadband must be an integer from 1 to 254.",
-                        "Joystickの不感帯は1～254の整数で入力してください。"));
+                     tr("Joystick Minimum Change must be an integer from 1 to 254.",
+                        "Joystickの最小変化量は1～254の整数で入力してください。"));
         return;
       }
       candidate.invertX = server.hasArg("jix_" + idx);
@@ -1887,8 +1890,8 @@ void handleSave() {
           !parseBoundedIntegerArg("fm_" + idx, 31, 2000,
                                   candidate.maxDistanceMm)) {
         sendUiResult(400, tr("Save error", "保存エラー"),
-                     tr("ToF Maximum Distance must be an integer from 31 to 2000 mm and Deadband must be an integer from 1 to 2000 mm.",
-                        "ToFの最大距離は31～2000 mm、不感帯は1～2000 mmの整数で入力してください。"));
+                     tr("ToF Maximum Distance must be an integer from 31 to 2000 mm and Minimum Change must be an integer from 1 to 2000 mm.",
+                        "ToFの最大距離は31～2000 mm、最小変化量は1～2000 mmの整数で入力してください。"));
         return;
       }
       candidate.nearValueHigh = server.hasArg("fi_" + idx) && server.arg("fi_" + idx).toInt() != 0;
