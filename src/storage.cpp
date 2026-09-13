@@ -111,7 +111,7 @@ void setDefaultDeviceMessages(ChainDevice& d) {
                              0, 10, 1, 0);
 
   d.enc.rotAddr       = "/avatar/parameters/Encoder";
-  d.enc.settingsModel = ENCODER_SETTINGS_LEGACY;
+  d.enc.settingsModel = ENCODER_SETTINGS_V2;
   d.enc.rotationMode  = ENCODER_ROTATION_AMOUNT;
   d.enc.rangeSteps    = 20;
   d.enc.clockwiseIncreases = true;

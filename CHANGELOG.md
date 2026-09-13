@@ -6,11 +6,13 @@ M5ChainOSCの主な変更履歴を記録します。
 
 ## [Unreleased]
 
-## [1.12.3] - 2026-09-13
+## [1.12.4] - 2026-09-13
 
 ### Changed
 
-- Legacy Encoderの回転設定を3列レイアウトへ整理し、ChainOSCminiと同じ項目順・表示形式へ統一
+- Web UIのEncoder設定表示を改善
+
+## [1.12.3] - 2026-09-13\r\n\r\n### Changed\r\n\r\n- Legacy Encoderの回転設定を3列レイアウトへ整理し、ChainOSCminiと同じ項目順・表示形式へ統一
 - IncrementモードではAbsolute専用項目を非表示にしつつ、他の項目の表示位置を維持するよう調整
 
 ## [1.12.2] - 2026-09-12
@@ -306,6 +308,7 @@ M5ChainOSCの主な変更履歴を記録します。
 - AtomS3R用Web Installerを公開
 
 [Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.12.3...HEAD
+[1.12.4]: https://github.com/shimez/M5ChainOSC/compare/v1.12.3...v1.12.4
 [1.12.3]: https://github.com/shimez/M5ChainOSC/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/shimez/M5ChainOSC/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/shimez/M5ChainOSC/compare/v1.12.0...v1.12.1
