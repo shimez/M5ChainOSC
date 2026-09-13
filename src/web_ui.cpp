@@ -1616,6 +1616,7 @@ void handleSave() {
     if (devices[i].type != CHAIN_ENCODER_TYPE_CODE)
       devices[i].displayName = candidateDisplayName;
 
+    bool angleResolutionChanged = false;
     if (devices[i].type == CHAIN_KEY_TYPE_CODE) {
       ChainDevice candidate = devices[i];
       if (server.hasArg("md_" + idx)) candidate.mode = server.arg("md_" + idx).toInt() == MODE_SEQUENCE ? MODE_SEQUENCE : MODE_PRESS_RELEASE;
@@ -1837,6 +1838,7 @@ void handleSave() {
         return;
       }
       if (server.hasArg("at_" + idx)) candidate.map.outType = (ValueType)server.arg("at_" + idx).toInt();
+      angleResolutionChanged = candidate.use12bit != devices[i].angle.use12bit;
       devices[i].angle = candidate;
     } else if (devices[i].type == CHAIN_JOYSTICK_TYPE_CODE) {
       JoystickOscConfig candidate = devices[i].joy;
@@ -1930,6 +1932,7 @@ void handleSave() {
         return;
       }
     }
+    if (angleResolutionChanged) devices[i].lastAngle = -99999;
   }
   sendUiResult(200, tr("Saved!", "保存しました！"), tr("All settings were saved.", "すべての設定を保存しました。"));
   MEMORY_DEBUG_LOG("SAVE_END", 0);
@@ -2167,6 +2170,9 @@ void handleImportDevicePreset() {
   }
   const bool importedV2 = candidate->type == CHAIN_ENCODER_TYPE_CODE &&
                           candidate->enc.settingsModel == ENCODER_SETTINGS_V2;
+  const bool angleResolutionChanged =
+      candidate->type == CHAIN_ANGLE_TYPE_CODE &&
+      candidate->angle.use12bit != devices[index].angle.use12bit;
   if (!saveDeviceSettings(*candidate)) {
     delete candidate;
     server.send(507, "text/plain; charset=utf-8",
@@ -2177,6 +2183,7 @@ void handleImportDevicePreset() {
   delete candidate;
 
   loadDeviceSettings(devices[index]);
+  if (angleResolutionChanged) devices[index].lastAngle = -99999;
   if (importedV2) resetEncoderV2Runtime(devices[index]);
   MEMORY_DEBUG_JSON("PRESET_END", 0, document);
   server.send(200, "text/plain; charset=utf-8",
