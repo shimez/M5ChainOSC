@@ -15,28 +15,8 @@ https://shimez.github.io/M5ChainOSC/installer/
 
 現在の正式版は`1.12.5`です。
 
-- Version 1.12.0: Chain EncoderのDevice Preset v2、Legacy設定の維持と明示的なV2移行、UID単位のruntime continuityに対応
-- Version 1.11.3: Web UIの入力検証を強化し、通常画面とAP Modeへfaviconを追加
-- Version 1.11.1: AP Modeのキャプティブポータルからの全設定削除に対応し、mDNSホスト名を`m5chainosc.local`へ変更
-- Version 1.11.0: Web UIから全設定を削除して再起動する機能を追加
-- Version 1.10.0: Wi-Fi認証情報、OSC送信先、画面回転、Web UI言語をLittleFSへ移行し、旧NVS設定の自動移行と原子的な保存に対応
-- Version 1.9.3: Press／ReleaseのOSC Address正規化を他のAddress処理と統一し、プリセットインポートエラーを対象デバイスカード内へ表示
-- Version 1.9.2: JSONインポート時のメッセージをChainOSC Device Preset Import Error Registry v1に沿った内容に修正（4種類）
-- Version 1.9.1: JSONインポート時のメッセージをChainOSC Device Preset Import Error Registry v1に沿った内容に修正（14種類）
-- Version 1.9.0: デバイス設定をLittleFSへ移行し、安全な保存・旧NVS設定の自動移行・種別ごと40件の保存に対応
-- Version 1.8.1: OSC送信先の表記をChainOSCシリーズで統一し、接続中デバイス設定の誤削除を防止
-- Version 1.8.0: 保存済みデバイス上限を40件へ拡張し、省容量なデバイス別保存方式と旧設定互換、JSONインポートの互換性・結果表示を改善
-- Version 1.7.0: Wi-Fi切断後の自動再接続とOSC送信表示を改善し、Sequenceの検証・正規化・String送信をChainOSCminiと統一
-- Version 1.6.1: Encoder、Angle、ToF、JoystickのWeb UIをグリッド配置へ整理し、狭い画面での表示を改善
-- Version 1.6.0: デバイス単位プリセットをChainOSCminiと共通化し、旧M5ChainOSC形式のインポート互換性を維持
-- Version 1.5.3: AtomS3R画面の描画範囲を最適化し、複数OSCメッセージの送信内容を順番に表示
-- Version 1.5.2: OSC Addressの入力検証をすべてのChainデバイス設定へ適用し、設定のJSONエクスポート／インポート互換性を改善
-- Version 1.5.1: Web UI送信時のタイムアウトを調整し、画面が白く表示されることがある問題を改善
-- Version 1.5.0: Chainデバイス設定の日本語表示拡充、Web UIとユーザーガイドの用語統一、各設定パラメータの解説追加、EncoderのIncrementモードに応じた表示整理に対応
-- Version 1.4.0: OSC送信時の画面ちらつきを抑制し、未保存表示、スクロール位置の維持、デバイス設定の折りたたみ、画面遷移のない設定保存・デバイス削除に対応
-- Version 1.3.0: Web UIの英語／日本語切り替え、AtomS3R画面上のバージョン表示、Web UIの表示高速化に対応
-- Version 1.2.0: 認識したChainデバイスの青色LED表示と、Web UIからの10秒間オレンジ識別表示に対応
-- Version 1.1.0: Chain ToFの最大距離、範囲外でのOSC送信停止、出力方向の設定に対応
+変更履歴はリポジトリの `CHANGELOG.md` を参照してください。
+
 
 ## ファームウェアの配置
 
