@@ -22,8 +22,13 @@ M5ChainOSCの主な変更履歴を記録します。
 ### Changed
 
 - Web UIのEncoder設定表示を改善
+- 保存設定のない新規Encoderでは、v2設定を初期設定として使用するよう変更
 
-## [1.12.3] - 2026-09-13\r\n\r\n### Changed\r\n\r\n- Legacy Encoderの回転設定を3列レイアウトへ整理し、ChainOSCminiと同じ項目順・表示形式へ統一
+## [1.12.3] - 2026-09-13
+
+### Changed
+
+- Legacy Encoderの回転設定を3列レイアウトへ整理し、ChainOSCminiと同じ項目順・表示形式へ統一
 - IncrementモードではAbsolute専用項目を非表示にしつつ、他の項目の表示位置を維持するよう調整
 
 ## [1.12.2] - 2026-09-12
@@ -318,7 +323,8 @@ M5ChainOSCの主な変更履歴を記録します。
 - Arduino IDEとPlatformIOの両方に対応
 - AtomS3R用Web Installerを公開
 
-[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.12.3...HEAD
+[Unreleased]: https://github.com/shimez/M5ChainOSC/compare/v1.12.5...HEAD
+[1.12.5]: https://github.com/shimez/M5ChainOSC/compare/v1.12.4...v1.12.5
 [1.12.4]: https://github.com/shimez/M5ChainOSC/compare/v1.12.3...v1.12.4
 [1.12.3]: https://github.com/shimez/M5ChainOSC/compare/v1.12.2...v1.12.3
 [1.12.2]: https://github.com/shimez/M5ChainOSC/compare/v1.12.1...v1.12.2
