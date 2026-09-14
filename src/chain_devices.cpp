@@ -398,8 +398,8 @@ void pollJoystick(ChainDevice& d) {
       bool cx = abs((int)x - (int)d.lastJoyX) >= max(1, d.joy.deadband);
       bool cy = abs((int)y - (int)d.lastJoyY) >= max(1, d.joy.deadband);
       if (cx || cy) {
-        d.lastJoyX = x;
-        d.lastJoyY = y;
+        if (cx) d.lastJoyX = x;
+        if (cy) d.lastJoyY = y;
         if (cx) {
           float xin = d.joy.invertX ? -(float)x : (float)x;
           float mx = mapClamped(xin, -127, 127, d.joy.map.outMin, d.joy.map.outMax);
