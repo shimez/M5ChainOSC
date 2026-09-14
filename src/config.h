@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include "M5Chain.h"
 
-static const char* APP_VERSION = "1.12.4";
+static const char* APP_VERSION = "1.12.5";
 
 // ---------------------------------------------------------------------------
 // Hardware / bus

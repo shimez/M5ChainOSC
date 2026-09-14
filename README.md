@@ -27,6 +27,14 @@ M5Stack AtomS3RとAtomic ToChain Baseを使い、M5Stack Chainデバイスの操
 
 バージョンごとの変更内容は[CHANGELOG.md](CHANGELOG.md)を参照してください。
 
+## 現在のバージョン
+
+### v1.12.5
+
+- Angle／Joystick／ToFのMinimum Change表記を整理
+- Angleの分解能変更直後の不要なOSC送信を防止
+- JoystickのMinimum Change判定をX／Y各軸で独立して管理
+
 ## 主な機能
 
 - 英語／日本語を切り替えられるWeb UIによる設定
